@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clicks Beta</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- ✅ Chart.js must load before app.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- ✅ Modal / Vote / Promo helpers -->
+  <style>
+    #bg{position:fixed;inset:0;z-index:0}
+    #loading{position:fixed;inset:0;z-index:10}
+    #app{position:relative;z-index:20}
+    .modal{
+      position:fixed;inset:0;display:none;
+      align-items:center;justify-content:center;
+      background:rgba(0,0,0,.75);z-index:9999
+    }
+    .modal-inner{
+      background:#111;color:#fff;border-radius:16px;
+      padding:24px;width:min(480px,92vw);
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+      position:relative
+    }
+    .close-x{position:absolute;top:10px;right:12px;cursor:pointer;font-weight:600;opacity:.85}
+    .close-x:hover{opacity:1}
+    .vote-compact-banner{
+      display:flex;align-items:center;gap:12px;
+      background:rgba(17,17,17,.65);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;padding:12px 16px;margin-top:10px;
+      backdrop-filter:blur(6px)
+    }
+    .vote-compact-logo img{height:28px;width:28px}
+    .promo-qr{
+      width:100px;height:100px;margin:10px auto;
+      display:block;background:#fff;border-radius:10px;
+      padding:6px;box-shadow:0 0 12px rgba(159,75,242,.4)
+    }
+    .promo-code{text-align:center;font-weight:700;color:var(--yellow)}
+    .promo-scans{text-align:center;font-size:13px;color:var(--gray)}
+  </style>
+</head>
+<body>
+
+<!-- 🌆 Background -->
+<div id="bg" aria-hidden="true">
+  <video autoplay muted loop playsinline id="bgVideo">
+    <source src="Media/home.mp4" type="video/mp4">
+  </video>
+  <img id="bgCrowd" src="Media/crowd.png" alt="">
+  <img id="bgLogo" src="Media/logo.png" alt="">
+</div>
+
+<!-- ⏳ Loading -->
+<div id="loading" aria-live="polite" aria-busy="true">
+  <div class="loader">
+    <img src="Media/logo.png" alt="Clicks Logo">
+    <div class="pulse"></div>
+  </div>
+</div>
+
+<!-- 🚀 App -->
+<div id="app" style="display:none">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <img src="Media/logo.png" alt="Clicks Logo">
+      <div class="name">CLICKS <span class="beta">beta</span></div>
+    </div>
+    <div class="row">
+      <button class="btn secondary" id="analyticsBtn" style="display:none">Analytics</button>
+      <button class="btn secondary" id="adminBtn" style="display:none">Admin Panel</button>
+      <div class="login-link" id="loginToggle" role="button" tabindex="0">Team Member? Log In.</div>
+    </div>
+  </header>
+
+  <!-- 👋 Welcome -->
+  <section class="welcome">
+    <h1><span class="headline">Welcome to Week <span id="weekNum"></span> of the Year</span></h1>
+    <div class="tagline-box">
+      <p class="tagline">WHERE THE CLICKS BEGIN</p>
+      <p id="quote" class="quote"></p>
+    </div>
+    <div class="actions">
+      <a href="#" id="viewVenues" class="btn glow">View Venues</a>
+      <a href="map.html" class="btn secondary">Open Map</a>
+    </div>
+
+    <!-- 🗳️ Voting -->
+    <section id="voteSection">
+      <h2 class="panel-title">Vote for Next Week’s Top Venues</h2>
+      <p>Cast your vote for which venue should be featured next week.</p>
+      <input type="text" id="voteSearch" placeholder="Search venues…" />
+      <div id="voteCarousel"></div>
+      <div id="leaderboard" class="hidden">
+        <ul id="leaderboardList"></ul>
+      </div>
+    </section>
+
+    <!-- 🌟 Clicks Picks -->
+    <section id="clicksPicks" style="display:none;margin-top:40px;">
+      <h2 class="panel-title" style="font-size:2.5em;text-align:center;color:var(--neon)">
+        Clicks Picks of the Week
+      </h2>
+      <div id="picksList" class="venue-list"></div>
+    </section>
+
+    <!-- 🎟️ Clicks Promotions -->
+<section id="clicksPromos" style="display:none;margin-top:40px;">
+  <h2 class="panel-title" style="font-size:2.5em;text-align:center;color:var(--yellow)">
+    Clicks Promotions
+  </h2>
+  <p style="text-align:center;color:var(--gray);margin-bottom:10px">
+    Exclusive deals and special offers available this week.
+  </p>
+  <div id="promosList" class="venue-list"></div>
+  <p id="noPromosMsg" style="display:none;text-align:center;opacity:0.7;margin-top:1em;">
+    No active promotions right now — check back soon!
+  </p>
+</section>
+  </section>
+  <!-- 🗺️ Zone Selection -->
+  <section id="zoneSelect" class="panel" style="display:none">
+    <h2 class="panel-title">Choose Your Zone</h2>
+    <div class="zone-grid">
+      <div class="zone-card" data-zone="La Placita" style="background-image:url('Media/placita.png')">
+        <span>La Placita</span>
+      </div>
+      <div class="zone-card" data-zone="Old San Juan" style="background-image:url('Media/vsj.png')">
+        <span>Old San Juan</span>
+      </div>
+      <div class="zone-card" data-zone="Calle Cerra" style="background-image:url('Media/cerra.png')">
+        <span>Calle Cerra</span>
+      </div>
+      <div class="zone-card" data-zone="Calle Loiza" style="background-image:url('Media/loiza.png')">
+        <span>Calle Loíza</span>
+      </div>
+      <div class="zone-card" data-zone="Condado" style="background-image:url('Media/condado.png')">
+        <span>Condado</span>
+      </div>
+    </div>
+    <div class="see-all" data-zone="">See All Venues</div>
+    <div class="row" style="margin-top:20px;">
+      <button class="btn secondary" id="zoneBackHome">← Back to Home</button>
+    </div>
+  </section>
+
+  <!-- 📍 Venues -->
+  <section id="venues" class="panel" style="display:none">
+    <h2 class="panel-title">Venues</h2>
+
+    <div class="row" style="margin-bottom:16px;">
+      <button class="btn secondary" id="backToZones">← Back to Zones</button>
+      <button class="btn secondary" id="backToHome">← Back to Home</button>
+    </div>
+
+    <!-- 🔎 Search bar -->
+    <div class="row" style="margin-bottom:16px;">
+      <input
+        type="text"
+        id="venueSearch"
+        placeholder="Search venues by name, price, or vibe..."
+        style="flex:1; padding:10px; border-radius:10px; border:1px solid var(--line); background:#111; color:#fff;"
+        autocomplete="off"
+      >
+    </div>
+
+    <div id="venueList" class="venue-list">No venues yet. Log in to add some.</div>
+  </section>
+
+  <!-- 🛠️ Admin Panel -->
+  <section id="adminPanel" class="panel admin-only" style="display:none">
+    <h2 class="panel-title">Admin Panel — Manage Venues</h2>
+    <input type="hidden" id="vId">
+
+    <div class="grid2">
+      <div>
+        <label for="vName">Name</label>
+        <input type="text" id="vName" autocomplete="off" placeholder="Venue name">
+      </div>
+      <div>
+        <label for="vCategory">Category</label>
+        <select id="vCategory">
+          <option>Bar</option>
+          <option>Club</option>
+          <option>Speakeasy</option>
+          <option>Rooftop</option>
+          <option>Lounge</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div>
+        <label for="vPrice">Price</label>
+        <select id="vPrice">
+          <option>$</option>
+          <option>$$</option>
+          <option>$$$</option>
+        </select>
+      </div>
+      <div>
+        <label for="vZone">Zone</label>
+        <select id="vZone">
+          <option>La Placita</option>
+          <option>Old San Juan</option>
+          <option>Calle Cerra</option>
+          <option>Calle Loiza</option>
+          <option>Condado</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="vZoneCustom">Custom Zone</label>
+        <input type="text" id="vZoneCustom" autocomplete="off" placeholder="Overrides the Zone dropdown">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="vImageFile">Image</label>
+      <input type="file" id="vImageFile" accept="image/*">
+      <input type="text" id="vImage" placeholder="Media/Venues/yourfile.jpg" autocomplete="off">
+      <small class="hint">Upload or paste a relative path. Uploads save to <code>Media/Venues/</code>.</small>
+    </div>
+
+    <div class="field">
+      <label for="vExpect">Description</label>
+      <textarea id="vExpect" autocomplete="off" placeholder="What to expect…"></textarea>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label for="vLat">Latitude</label>
+        <input type="text" id="vLat" autocomplete="off" placeholder="18.45">
+      </div>
+      <div>
+        <label for="vLng">Longitude</label>
+        <input type="text" id="vLng" autocomplete="off" placeholder="-66.07">
+      </div>
+    </div>
+
+    
+    <!-- 🌐 Auto-Import (Google Places) -->
+    <div class="panel" style="margin-top:16px">
+      <h3 class="panel-title">Auto-Import (Google)</h3>
+      <div class="grid3">
+        <div>
+          <label>Query</label>
+          <input type="text" id="gQuery" placeholder="bars in Condado San Juan">
+        </div>
+        <div>
+          <label>Zone (override)</label>
+          <input type="text" id="gZone" placeholder="Condado">
+        </div>
+        <div>
+          <label>Category hint</label>
+          <select id="gCat">
+            <option value="">(auto)</option>
+            <option>Bar</option>
+            <option>Club</option>
+            <option>Speakeasy</option>
+            <option>Rooftop</option>
+            <option>Lounge</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid3" style="margin-top:8px">
+        <div>
+          <label>Lat</label>
+          <input type="text" id="gLat" placeholder="18.456">
+        </div>
+        <div>
+          <label>Lng</label>
+          <input type="text" id="gLng" placeholder="-66.07">
+        </div>
+        <div>
+          <label>Radius (m)</label>
+          <input type="number" id="gRadius" value="1200">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="gImportBtn">Import Venues</button>
+      </div>
+      <small class="muted">Tip: usa solo <b>Query</b> para Text Search o usa <b>Lat/Lng</b>+<b>Radius</b> para Nearby.</small>
+      <button class="btn danger" id="resetLeaderboards">Reset Leaderboards</button>
+    </div>
+
+
+    <div class="field checkbox-field">
+      <input type="checkbox" id="vPick">
+      <label for="vPick">Mark as Clicks Pick</label>
+    </div>
+
+    <!-- 🧩 Promotions (Admin) -->
+    <div class="field checkbox-field">
+      <input type="checkbox" id="vPromo">
+      <label for="vPromo">Mark as Clicks Promotion</label>
+    </div>
+    <div class="field">
+      <label for="vPromoTitle">Promotion Title</label>
+      <input type="text" id="vPromoTitle" placeholder="Corona 2x5" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="vPromoDesc">Promotion Description</label>
+      <textarea id="vPromoDesc" placeholder="Enjoy the delicious Mexican beer of Corona Extra. Take it with lime." autocomplete="off"></textarea>
+    </div>
+    <div class="field">
+      <label for="vPromoImage">Promotion Image</label>
+      <input type="file" id="vPromoImage" accept="image/*">
+      <input type="text" id="vPromoImagePath" placeholder="Media/Promotions/yourfile.jpg" autocomplete="off">
+      <div class="muted">Upload or paste a relative path. Uploads save to <code>Media/Promotions/</code>.</div>
+      <img id="vPromoPreview" style="display:none;margin-top:8px;max-width:260px;border-radius:10px;border:1px solid var(--line)" alt="">
+    </div>
+    <!-- (QR + code are generated by app.js on claim; not edited here) -->
+
+    <div class="row" style="margin-top:12px; flex-wrap:wrap; gap:10px;">
+      <button class="btn glow" id="addVenueBtn" type="button">Save Venue</button>
+      <button class="btn danger" id="clearVenuesBtn" type="button">Clear All Venues</button>
+      <button class="btn danger" id="resetVotesBtn" type="button">Reset All Votes</button>
+      <button class="btn secondary" id="adminBackHome" type="button">← Back to Home</button>
+    </div>
+  </section>
+  <!-- 📊 Analytics -->
+  <section id="analyticsPanel" class="panel" style="display:none">
+    <h2 class="panel-title">Analytics</h2>
+
+    <div class="analytics-grid">
+      <div class="an-card">
+        <div class="an-title">Users</div>
+        <div class="an-kpi">Unique: <span id="kpiUsers">0</span></div>
+        <div class="an-kpi">Clicking: <span id="kpiClickingUsers">0</span></div>
+        <div class="an-kpi">Non-Clicking: <span id="kpiNonClickingUsers">0</span></div>
+      </div>
+
+      <div class="an-card">
+        <div class="an-title">Sessions</div>
+        <div class="an-kpi">Total: <span id="kpiSessions">0</span></div>
+        <div class="an-kpi">Avg /User: <span id="kpiAvgSessions">0</span></div>
+      </div>
+
+      <div class="an-card">
+        <div class="an-title">Engagement</div>
+        <div class="an-kpi">Clicks /User: <span id="kpiAvg">0</span></div>
+        <div class="an-kpi">Session (min): <span id="kpiTime">0</span></div>
+        <div class="an-kpi">Time to 1st Click: <span id="kpiFirstClick">0</span></div>
+      </div>
+
+      <div class="an-card">
+        <div class="an-title">Zones</div>
+        <table class="an-table" id="zonesTable">
+          <thead><tr><th>Zone</th><th>Clicks</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="an-card" style="grid-column:1/-1">
+        <div class="an-title">Top Venues</div>
+        <table class="an-table" id="venuesTable">
+          <thead><tr><th>Rank</th><th>Venue</th><th>Zone</th><th>Clicks</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="see-all" id="seeAllVenuesAnalytics">See All Venues</div>
+      </div>
+
+      <div class="an-card" style="grid-column:1/-1">
+        <div class="an-title">Admin Logins (<span id="adminLoginCount">0</span>)</div>
+        <table class="an-table" id="adminLoginsTable">
+          <thead><tr><th>When</th><th>IP</th><th>Device</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="row" style="margin-top:12px">
+          <button class="btn secondary" id="seeAllLogins">See All Log Ins</button>
+          <button class="btn danger" id="resetAdminLogins">Reset Admin Logins</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:20px;">
+      <h3 class="panel-title">Clicks by Zone</h3>
+      <canvas id="zoneChart"></canvas>
+    </div>
+
+    <div class="panel" style="margin-top:20px;">
+      <h3 class="panel-title">Clicks Over Time</h3>
+      <canvas id="timeChart"></canvas>
+    </div>
+
+    <!-- 🏆 Weekly Votes Leaderboard -->
+    <div class="an-card" style="grid-column:1/-1;margin-top:20px;">
+      <div class="an-title">Weekly Votes Leaderboard</div>
+
+      <div class="row" style="margin-bottom:10px;gap:10px;flex-wrap:wrap;">
+        <select id="filterYear" class="filter-dropdown">
+          <option value="">Select Year</option>
+        </select>
+        <select id="filterWeek" class="filter-dropdown">
+          <option value="">Select Week</option>
+        </select>
+        <button class="btn secondary" id="refreshLeaderboard">↻ Refresh</button>
+        <button class="btn secondary" id="downloadLeaderboardExcel">📊 Export Excel</button>
+      </div>
+
+      <table class="an-table" id="votesLeaderboardTable">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Venue</th>
+            <th>Votes</th>
+            <th>Week</th>
+            <th>Year</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 🎟 Promotions Performance -->
+    <div class="an-card" style="grid-column:1/-1;margin-top:20px;">
+      <div class="an-title">Promotions Performance</div>
+      <table class="an-table" id="promosTable">
+        <thead><tr><th>Venue</th><th>Promotion</th><th>Claims</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:10px;">
+      <button class="btn secondary" id="refreshAnalytics">↻ Refresh</button>
+      <button class="btn danger" id="resetAnalytics">Reset Analytics</button>
+      <button class="btn danger" id="resetClicks">Reset Clicks</button>
+      <button class="btn danger" id="resetPromotions">♻ Reset Promotion Claims</button>
+      <button class="btn secondary" id="backFromAnalytics">← Back</button>
+    </div>
+  </section>
+  <!-- ⚙️ Footer -->
+  <footer class="footer">
+    <p>Powered by <span class="brand-accent">MyCreate</span></p>
+  </footer>
+  <div class="version-tag">v0.9.6</div>
+
+  <!-- 🔐 Login Modal -->
+  <div class="modal" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle" aria-hidden="true">
+    <div class="modal-inner">
+      <div class="close-x" id="loginClose" aria-label="Close">✕</div>
+      <h4 class="login-title" id="loginTitle">Team Login</h4>
+      <input type="text" id="uName" placeholder="Username" autocomplete="off">
+      <input type="password" id="uPass" placeholder="Password" autocomplete="off">
+      <button class="btn glow" id="loginBtn">Log In</button>
+      <div class="error" id="loginErr">Invalid credentials.</div>
+      <div class="success" id="loginOk">Welcome! Admin tools unlocked.</div>
+    </div>
+  </div>
+
+  <!-- 🧾 Logins Modal -->
+  <div class="modal" id="loginsModal" role="dialog" aria-modal="true" aria-labelledby="allLoginsTitle" aria-hidden="true">
+    <div class="modal-inner">
+      <div class="close-x" id="loginsClose" aria-label="Close">✕</div>
+      <h4 class="login-title" id="allLoginsTitle">All Admin Log Ins</h4>
+      <table class="an-table full-width" id="allLoginsTable">
+        <thead><tr><th>When</th><th>IP</th><th>Device</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 🏠 Venue Detail Modal (fixed layout: Zone / Category • Price / Description) -->
+  <div class="modal" id="venueModal" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle" aria-hidden="true">
+    <div class="modal-inner">
+      <div class="close-x" id="venueClose" aria-label="Close">✕</div>
+
+      <h3 id="venueModalTitle"></h3>
+      <img id="venueModalImage" src="" alt="" style="display:block;border-radius:12px;margin-bottom:10px;">
+
+      <!-- 🟢 Unified info block (always visible if data exists) -->
+      <div id="venueInfoBlock" style="margin-top:8px;line-height:1.5;">
+        <p id="venueInfoZone" style="font-weight:600;color:var(--yellow);margin-bottom:4px;">
+          <span id="venueModalZone"></span>
+        </p>
+        <p id="venueInfoCatPrice" style="font-weight:600;color:#e5e7eb;margin-bottom:8px;">
+          <span id="venueModalCategory"></span> • <span id="venueModalPrice"></span>
+        </p>
+        <p id="venueModalExpect" style="font-style:italic;color:#d1d5db;margin-bottom:10px;"></p>
+      </div>
+
+      <!-- Promotion Info -->
+      <div id="venuePromoContainer" style="display:none;margin-top:15px;">
+        <h4 style="color:var(--yellow);">Active Promotion</h4>
+        <img id="venuePromoImage" alt="Promotion" style="display:none;margin:8px 0;max-width:100%;border-radius:12px;border:1px solid var(--line)">
+        <p id="venuePromoTitle" style="font-weight:800;margin:6px 0 2px;"></p>
+        <p id="venuePromoDesc" style="opacity:.9;margin-bottom:8px;"></p>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0;">
+          <button class="map-btn" id="venuePromoMap">Open in Map</button>
+          <button class="click-btn" id="claimPromoBtn">Claim promotion</button>
+        
+    <p id="venuePromoClaims" class="promo-claims" style="margin-top:6px;"></p>
+    </div>
+        <img id="venuePromoQR" class="promo-qr" src="" alt="QR Code" style="display:none">
+        <div class="promo-code" id="venuePromoCode" style="display:none"></div>
+        <div class="promo-scans" id="venuePromoScans" style="margin-top:6px;opacity:.75"></div>
+        </div>
+
+     
+
+  <!-- 📜 All Venues Modal -->
+  <div class="modal" id="allVenuesModal" role="dialog" aria-modal="true" aria-labelledby="allVenuesTitle" aria-hidden="true">
+    <div class="modal-inner">
+      <div class="close-x" id="allVenuesClose" aria-label="Close">✕</div>
+      <h4 class="login-title" id="allVenuesTitle">All Venues</h4>
+      <table class="an-table full-width" id="allVenuesTable">
+        <thead><tr><th>Rank</th><th>Venue</th><th>Zone</th><th>Clicks</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:12px;justify-content:center;">
+        <button class="btn secondary" id="allVenuesPrev">← Prev</button>
+        <button class="btn secondary" id="allVenuesNext">Next →</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- 📦 Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+
+<!-- 🧠 Modal Closing Helpers -->
+<script>
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal').forEach(m => {
+        m.style.display = 'none';
+        m.setAttribute('aria-hidden', 'true');
+      });
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const modal = e.target.closest('.modal');
+    if (modal && e.target === modal) {
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  });
+</script>
+
+    <!-- Claim Confirmation Modal -->
+    <div id="claimConfirm" class="modal" style="display:none;align-items:center;justify-content:center;">
+      <div class="modal-content" style="max-width:560px;border:1px solid var(--line);background:rgba(15,15,22,.98);padding:20px;border-radius:16px;">
+        <h3 style="margin:0 0 8px;color:#fca5a5;letter-spacing:.4px;">⚠️ WARNING</h3>
+        <p id="claimConfirmText" style="line-height:1.4;color:#e5e7eb;margin:0 0 12px;">
+          <b>Warning:</b> Claiming a promotion will <b>consume</b> it. Make sure you are at the venue and have the bartender ready to scan.
+        </p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="cancelClaim" class="ghost-btn" style="padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:transparent;color:#e5e7eb;font-weight:700;">Cancel</button>
+          <button id="confirmClaim" class="danger-btn" style="padding:10px 14px;border:none;border-radius:10px;font-weight:800;text-transform:uppercase;background:linear-gradient(135deg,#ef4444,#f97316);color:white;">Claim Promotion</button>
+        </div>
+      </div>
+    </div>
+    
+</body>
+</html>

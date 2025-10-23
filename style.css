@@ -1,0 +1,977 @@
+:root {
+  --coral:#FF5A5F;
+  --neon:#9F4BF2;
+  --yellow:#FFD75E;
+  --black:#0C0C10;
+  --gray:#9CA3AF;
+  --line:#1f2126;
+  --pickGreen:#10b981;
+  --mapGreen1:#34d399;
+  --mapGreen2:#059669;
+}
+
+/* RESET */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  height:100%;
+  font-family:Inter,system-ui,Segoe UI,Helvetica,Arial,sans-serif;
+  background:var(--black);
+  color:#fff;
+}
+
+/* BACKGROUND */
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+#bgVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:brightness(.35) blur(2px)}
+#bgCrowd{position:absolute;left:0;bottom:0;width:100%;height:auto;z-index:1;opacity:.75}
+#bgLogo{position:absolute;left:50%;top:18%;transform:translateX(-50%);width:min(70vw,720px);height:auto;z-index:0;opacity:.08;filter:drop-shadow(0 0 12px rgba(255,255,255,.15))}
+
+/* LOADING */
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:50}
+.loader img{height:64px}
+.pulse{width:10px;height:10px;border-radius:999px;background:#fff;opacity:.7;margin:10px auto;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.4);opacity:.45}100%{transform:scale(1);opacity:.7}}
+
+/* APP CONTAINER */
+#app{position:relative;z-index:10}
+
+/* HEADER */
+.header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 20px;border-bottom:1px solid var(--line);
+  background:rgba(20,20,28,.72);backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:11
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:32px}
+.brand .name{font-family:"Bebas Neue",sans-serif;font-size:24px;letter-spacing:1px}
+.brand .beta{font-family:'Comic Neue',cursive;font-size:18px;color:var(--yellow);margin-left:4px;vertical-align:super}
+.login-link{cursor:pointer;color:#e5e7eb;font-weight:800;opacity:.85}
+
+.version-tag{
+  position:fixed;bottom:6px;left:10px;
+  font-size:12px;font-weight:600;color:#9ca3af;
+  background:rgba(20,20,28,.75);border:1px solid var(--line);
+  padding:2px 6px;border-radius:6px;z-index:100
+}
+
+/* WELCOME / HERO */
+.welcome{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:40px 16px}
+.headline{font-size:clamp(36px,6vw,64px);font-family:"Bebas Neue",sans-serif;background:linear-gradient(90deg,var(--coral),var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:3px}
+.tagline-box{background:rgba(0,0,0,.4);padding:12px 20px;border-radius:12px;backdrop-filter:blur(4px)}
+.tagline{font-size:22px;font-weight:600;margin:4px 0 6px;color:#f3f4f6;letter-spacing:2px}
+.quote{font-size:15px;color:#d1d5db;font-style:italic;margin-top:2px}
+
+/* BUTTONS */
+.btn{
+  display:inline-block;padding:10px 16px;border-radius:12px;
+  font-weight:800;text-decoration:none;
+  color:#fff !important;background:linear-gradient(135deg,var(--coral),var(--neon));
+  margin:6px;cursor:pointer;user-select:none;border:none;
+  font-size:15px;transition:transform .2s,opacity .2s
+}
+.btn:hover{transform:scale(1.05);opacity:.95}
+.btn.secondary{background:#17181c;border:1px solid var(--line);color:#fff !important}
+.btn.glow{box-shadow:0 0 12px rgba(159,75,242,.4)}
+.btn.small{padding:4px 10px;font-size:13px;border-radius:8px}
+.btn.danger{background:#b91c1c;color:#fff !important}
+.btn.danger:hover{background:#dc2626}
+
+.row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* PANELS */
+.panel{
+  max-width:900px;margin:40px auto;
+  background:rgba(20,20,28,.7);
+  border:1px solid var(--line);
+  border-radius:18px;padding:20px;
+  backdrop-filter:blur(10px)
+}
+.panel-title{font-family:"Bebas Neue",sans-serif;font-size:26px;margin-bottom:16px;color:var(--yellow)}
+
+/* Picks */
+#clicksPicks{width:100%;max-width:900px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
+#clicksPicks .panel-title{color:var(--neon);text-align:center;margin-bottom:16px;font-size:40px}
+
+/* GRID HELPERS */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media (max-width:720px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* ZONE SELECT */
+.zone-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.zone-card{position:relative;height:160px;border-radius:14px;overflow:hidden;cursor:pointer;border:1px solid var(--line);background-size:cover;background-position:center;background-repeat:no-repeat}
+.zone-card::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.5),rgba(0,0,0,0));transition:background .3s}
+.zone-card:hover::after{background:linear-gradient(to top,rgba(0,0,0,.7),rgba(0,0,0,.2))}
+.zone-card span{position:absolute;bottom:12px;left:12px;font-family:"Bebas Neue",sans-serif;font-size:22px;color:#fff;text-shadow:0 0 8px rgba(0,0,0,.8);z-index:1}
+.see-all{margin-top:30px;text-align:center;font-size:15px;color:var(--gray);cursor:pointer}
+.see-all:hover{color:#d1d5db}
+
+/* VENUE LIST & CARDS — GRID */
+.venue-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+  gap:20px;
+}
+.venue-card{
+  display:flex;flex-direction:column;justify-content:space-between;
+  background:rgba(20,20,28,.7);
+  border:1px solid var(--line);border-radius:16px;padding:16px;
+  transition:.3s;cursor:pointer;overflow:hidden;
+  min-height:340px;
+  position:relative;
+}
+.venue-card:hover{transform:translateY(-4px);border-color:var(--neon);box-shadow:0 0 16px rgba(159,75,242,.6)}
+.venue-thumb{width:100%;height:160px;object-fit:cover;border-radius:12px;margin-bottom:10px}
+.pick-ribbon{position:absolute;top:12px;left:12px;background:var(--pickGreen);color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:4px;transform:rotate(-6deg);box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:2;pointer-events:none}
+.venue-title{font-family:"Bebas Neue",sans-serif;font-size:22px;background:linear-gradient(90deg,var(--coral),var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;margin-bottom:4px}
+.venue-meta-line{font-size:13px;color:#cbd5e1;margin:2px 0}
+.venue-zone{font-weight:600;color:var(--yellow)}
+.venue-cat{font-weight:600;color:var(--neon)}
+.venue-price{font-weight:800;letter-spacing:1px;background:linear-gradient(90deg,var(--mapGreen1),var(--mapGreen2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.venue-desc{
+  margin-top:12px;
+  margin-bottom:14px;
+  font-size:14px;font-style:italic;
+  color:#f3f4f6;
+  border-left:3px solid var(--neon);
+  padding-left:8px
+}
+
+/* Clicks inside cards */
+.venue-clickbar{display:flex;flex-direction:column;gap:6px}
+.button-row{display:flex;flex-direction:row;justify-content:space-between;align-items:center;width:100%}
+.click-btn,.map-btn{
+  display:flex;align-items:center;gap:6px;
+  border:none;border-radius:12px;
+  padding:6px 14px;font-weight:800;
+  color:#fff !important;
+  cursor:pointer;transition:transform .2s
+}
+.click-btn{background:linear-gradient(135deg,var(--coral),var(--neon))}
+.click-btn:hover{transform:scale(1.05)}
+.map-btn{background:linear-gradient(135deg,var(--mapGreen1),var(--mapGreen2))}
+.map-btn:hover{transform:scale(1.05);opacity:.95}
+.click-icon{height:16px;width:16px}
+.click-count{font-size:13px;color:#cbd5e1}
+.click-meter{height:4px;background:#222;border-radius:4px;overflow:hidden;width:100%}
+.click-fill{height:100%;background:linear-gradient(90deg,var(--coral),var(--neon));transition:width .1s linear}
+.admin-actions{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.boost-buttons{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+
+/* FORM ELEMENTS */
+input, select, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0f1014;color:#e5e7eb}
+.muted{font-size:12px;color:var(--gray);margin-top:6px}
+
+/* MODAL BASE */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7);z-index:200}
+.modal-inner{width:100%;max-width:700px;background:#121318;border:1px solid var(--line);border-radius:16px;padding:20px;position:relative}
+.close-x{cursor:pointer;color:#9CA3AF;font-size:20px;position:absolute;top:12px;right:16px}
+.close-x:hover{color:#fff}
+
+/* LOGIN MODAL */
+.login-title{font-family:"Bebas Neue",sans-serif;font-size:26px;color:var(--neon);margin-bottom:12px;text-align:center}
+.error{color:#ffb4b6;font-size:12px;display:none;margin-top:6px}
+.success{color:#bff4bf;font-size:12px;display:none;margin-top:6px}
+
+/* VENUE DETAIL MODAL */
+#venueModalImage{width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin-bottom:12px}
+#venueModalTitle{font-family:"Bebas Neue",sans-serif;font-size:28px;margin-bottom:8px;background:linear-gradient(90deg,var(--coral),var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#venueModalExpect{font-style:italic;margin-bottom:12px}
+#venueModalZone{color:var(--yellow);font-weight:600}
+#venueModalCategory{color:var(--neon);font-weight:600}
+#venueModalPrice{font-weight:800;background:linear-gradient(90deg,var(--mapGreen1),var(--mapGreen2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* ANALYTICS */
+.analytics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.an-card{background:rgba(20,20,28,.7);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.an-title{font-family:"Bebas Neue",sans-serif;font-size:20px;margin-bottom:6px;color:var(--neon)}
+.an-kpi{font-size:15px;font-weight:600;color:#f3f4f6}
+.an-kpi span{color:var(--yellow);font-weight:800}
+.an-table{width:100%;border-collapse:collapse;margin-top:6px}
+.an-table th,.an-table td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+canvas{max-width:100%;height:300px !important}
+
+/* FOOTER */
+.footer{text-align:center;padding:40px 20px;margin-top:60px;border-top:1px solid var(--line);background:rgba(20,20,28,.7);color:var(--gray)}
+.footer .brand-accent{color:var(--neon);font-weight:600}
+
+/* MAP POPUP OVERRIDE */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+/* MAP MARKERS */
+.marker-normal {
+  width: 14px;
+  height: 14px;
+  background: #3b82f6;
+  border: 2px solid #1e3a8a;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(59,130,246,0.6);
+}
+.marker-pick {
+  width: 16px;
+  height: 16px;
+  background: var(--neon);
+  border: 3px solid var(--yellow);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(159,75,242,0.9),0 0 18px rgba(255,215,94,0.6);
+}
+
+/* ===========================
+   🗳️ WEEKLY VOTING (Enhanced Carousel)
+   =========================== */
+
+#voteSection {
+  width: 100%;
+  max-width: 950px;
+  margin: 40px auto;
+  padding: 30px 24px;
+  background: rgba(20, 20, 28, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 0 24px rgba(159, 75, 242, 0.15);
+  transition: all 0.4s ease;
+  position: relative;
+}
+
+/* 🧼 Hide background when .no-bg is active (used by thank-you & compact states) */
+#voteSection.no-bg {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+}
+
+#voteSection:hover {
+  box-shadow: 0 0 32px rgba(159, 75, 242, 0.25);
+}
+
+#voteSection .panel-title {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(28px, 5vw, 42px);
+  color: var(--neon);
+  text-align: center;
+  letter-spacing: 1px;
+  margin-bottom: 18px;
+  text-shadow: 0 0 10px rgba(159, 75, 242, 0.4);
+}
+
+#voteSection p {
+  text-align: center;
+  color: #d1d5db;
+  font-size: 15px;
+  margin-bottom: 18px;
+}
+
+/* 🔍 Search Bar */
+#voteSearch {
+  display: block;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto 20px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #0f1014;
+  color: #f3f4f6;
+  font-size: 15px;
+  text-align: center;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+#voteSearch:focus {
+  border-color: var(--neon);
+  box-shadow: 0 0 12px rgba(159, 75, 242, 0.3);
+}
+
+/* 🎠 Horizontal Carousel */
+#voteCarousel {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 10px;
+}
+
+.vote-card {
+  flex: 0 0 240px;
+  scroll-snap-align: start;
+  background: rgba(20, 20, 28, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  transition: transform 0.35s ease, box-shadow 0.4s ease, border-color 0.3s ease;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  text-align: center;
+}
+
+.vote-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--neon);
+  box-shadow: 0 0 24px rgba(159, 75, 242, 0.4);
+}
+
+.vote-card img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  transition: transform 0.5s ease;
+}
+
+.vote-card:hover img {
+  transform: scale(1.05);
+}
+
+.vote-card .venue-name {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: var(--neon);
+  text-align: center;
+  margin-bottom: 6px;
+  transition: color 0.3s ease;
+}
+
+.vote-card:hover .venue-name {
+  color: var(--yellow);
+}
+
+.vote-card .venue-zone {
+  text-align: center;
+  color: var(--yellow);
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 6px rgba(255, 215, 94, 0.4);
+}
+
+/* ✨ Vote Button */
+.btn-vote {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--coral), var(--neon));
+  border: none;
+  border-radius: 10px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 12px rgba(159, 75, 242, 0.3);
+}
+
+.btn-vote:hover {
+  transform: scale(1.07);
+  box-shadow: 0 0 18px rgba(159, 75, 242, 0.6);
+  background: linear-gradient(135deg, var(--neon), var(--coral));
+}
+
+/* 🏆 Leaderboard */
+.leaderboard {
+  background: rgba(20, 20, 28, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 30px;
+  box-shadow: 0 0 18px rgba(159, 75, 242, 0.25);
+  animation: fadeInUp 0.6s ease;
+}
+
+.leaderboard h3 {
+  text-align: center;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.8em;
+  color: var(--neon);
+  text-shadow: 0 0 8px rgba(159, 75, 242, 0.6);
+  margin-bottom: 14px;
+}
+
+.leaderboard ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+}
+
+.leaderboard li {
+  font-weight: 700;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: #f3f4f6;
+  text-align: center;
+}
+
+.leaderboard li:first-child {
+  color: var(--yellow);
+  font-size: 1.2em;
+  text-shadow: 0 0 8px rgba(255, 215, 94, 0.6);
+}
+
+.hidden {
+  display: none;
+}
+
+#closeLeaderboard {
+  display: block;
+  margin: 0 auto;
+}
+
+/* 🌟 Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 📱 Mobile Adjustments */
+@media (max-width: 600px) {
+  #voteSection {
+    padding: 20px 14px;
+    border-radius: 16px;
+  }
+  .vote-card {
+    flex: 0 0 200px;
+    padding: 14px;
+  }
+  .vote-card img {
+    height: 140px;
+  }
+  .btn-vote {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  .leaderboard h3 {
+    font-size: 1.4em;
+  }
+}
+/* ===========================
+  /* =========================
+   🗳️ Vote Confirmation — Polished Finish
+========================= */
+.vote-confirm-box {
+  text-align: center;
+  padding: 60px 30px;
+  background: rgba(20, 20, 28, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 24px rgba(159, 75, 242, 0.25);
+  max-width: 720px;
+  margin: 60px auto;
+  animation: fadeInVote 0.7s ease-out forwards;
+}
+
+.vote-confirm-box h2 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(30px, 6vw, 46px);
+  color: var(--neon);
+  letter-spacing: 1px;
+  text-shadow: 0 0 12px rgba(159, 75, 242, 0.4);
+  margin-bottom: 10px;
+}
+
+.vote-confirm-box p {
+  font-size: 16px;
+  color: #d1d5db;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+#voteCountdown {
+  color: var(--yellow);
+  font-weight: 900;
+  font-family: "Bebas Neue", sans-serif;
+  letter-spacing: 1.3px;
+  font-size: 1.7em; /* 🔸 slightly smaller than before */
+  text-shadow:
+    0 0 8px rgba(255, 215, 94, 0.8),
+    0 0 16px rgba(159, 75, 242, 0.5);
+  animation: glowPulse 2.2s ease-in-out infinite;
+}
+
+.vote-confirm-box h3 {
+  color: var(--neon);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.6em;
+  margin: 24px 0 12px;
+  text-shadow: 0 0 8px rgba(159, 75, 242, 0.5);
+}
+
+#leaderboardList {
+  list-style: none;
+  padding: 0;
+  margin: 0 auto;
+  max-width: 400px;
+}
+
+#leaderboardList li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+  color: #f3f4f6;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+#leaderboardList li:first-child {
+  color: var(--yellow);
+  font-size: 1.2em;
+  text-shadow: 0 0 8px rgba(255, 215, 94, 0.6);
+}
+
+#leaderboardList li:hover {
+  color: var(--neon);
+  transform: scale(1.02);
+}
+
+/* Subtle floating animation for delight */
+@keyframes fadeInVote {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+/* =========================
+   🟣 Compact Vote Banner — Neon Aesthetic
+========================= */
+.hide-details-btn {
+  margin-top: 20px;
+  background: #17181c;
+  border: 1px solid var(--line);
+  color: var(--gray);
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.hide-details-btn:hover {
+  color: var(--neon);
+  border-color: var(--neon);
+  box-shadow: 0 0 10px rgba(159, 75, 242, 0.3);
+}
+
+.vote-confirm-box.collapsed {
+  display: none;
+}
+
+.vote-compact-banner {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(
+    145deg,
+    rgba(20, 20, 28, 0.92),
+    rgba(30, 12, 40, 0.92)
+  );
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow:
+    0 0 10px rgba(159, 75, 242, 0.25),
+    0 0 25px rgba(255, 215, 94, 0.08);
+  padding: 16px 22px;
+  margin-top: 20px;
+  backdrop-filter: blur(12px);
+  animation: fadeInUp 0.5s ease;
+}
+
+.vote-compact-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: linear-gradient(90deg, var(--neon), var(--coral), var(--yellow));
+  opacity: 0.25;
+  filter: blur(14px);
+  z-index: -1;
+}
+
+.vote-compact-text {
+  color: #e5e7eb;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.vote-compact-text strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 20px;
+  color: var(--neon);
+  text-shadow: 0 0 10px rgba(159, 75, 242, 0.5);
+}
+
+.vote-compact-text small {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 20px;                /* 🔸 Bigger timer */
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--yellow);
+  text-shadow:
+    0 0 8px rgba(255, 215, 94, 0.7),
+    0 0 14px rgba(159, 75, 242, 0.5); /* 🔸 Neon glow */
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+
+.show-details-btn.small {
+  background: linear-gradient(135deg, var(--coral), var(--neon));
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  border-radius: 14px;
+  padding: 10px 18px;
+  cursor: pointer;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  font-size: 13px;
+  transition: all 0.25s ease;
+  box-shadow: 0 0 10px rgba(159, 75, 242, 0.4);
+}
+
+.show-details-btn.small:hover {
+  transform: scale(1.07);
+  box-shadow: 0 0 16px rgba(159, 75, 242, 0.6);
+  background: linear-gradient(135deg, var(--neon), var(--coral));
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    text-shadow:
+      0 0 6px rgba(255, 215, 94, 0.6),
+      0 0 12px rgba(159, 75, 242, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow:
+      0 0 10px rgba(255, 215, 94, 0.9),
+      0 0 20px rgba(159, 75, 242, 0.6);
+    transform: scale(1.05);
+  }
+}
+/* =========================
+   🟣 Clicks Logos inside Vote Banners
+========================= */
+.vote-confirm-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.vote-confirm-logo img {
+  height: 60px;           /* medium for main banner */
+  width: auto;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(159, 75, 242, 0.3);
+  animation: logoPulse 3s ease-in-out infinite;
+}
+
+.vote-compact-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.vote-compact-logo img {
+  height: 32px;           /* smaller for compact banner */
+  width: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(159, 75, 242, 0.25);
+  animation: logoPulse 3s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(159, 75, 242, 0.3);
+  }
+  50% {
+    transform: scale(1.07);
+    box-shadow: 0 0 20px rgba(255, 215, 94, 0.4);
+  }
+}
+
+
+
+/* --- Promo cards styled same as venue cards but separate class to avoid logic collisions --- */
+.promo-card{
+  display:flex;flex-direction:column;justify-content:space-between;
+  background:var(--panel);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;padding:16px;
+  transition:.3s;cursor:pointer;overflow:hidden;
+  min-height:340px;position:relative;
+}
+.promo-card:hover{
+  transform:translateY(-4px);border-color:var(--neon);box-shadow:0 0 16px rgba(159,75,242,.6);
+}
+.promo-card .venue-image-wrap{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+.promo-card .venue-thumb{width:100%;height:160px;object-fit:cover;display:block}
+.promo-card .venue-title{font-family:"Bebas Neue",system-ui;font-size:22px;background:linear-gradient(90deg,var(--coral),var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;margin:8px 0 4px}
+.promo-card .venue-meta-line{font-size:13px;color:#cbd5e1;margin:2px 0}
+.promo-card .venue-desc{margin-top:6px;font-size:14px;color:#f3f4f6;font-style:italic;border-left:3px solid var(--neon);padding-left:8px}
+
+/* ===== Added scroll fix for long promotion modals ===== */
+.modal-inner, .promo-modal-content, .modal-body {
+  max-height: 80vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.modal-inner::-webkit-scrollbar, .promo-modal-content::-webkit-scrollbar, .modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-inner::-webkit-scrollbar-thumb, .promo-modal-content::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.25);
+  border-radius: 4px;
+}
+
+/* === Centered Promo Container and See Venue link (Clicks aesthetic fix) === */
+#venuePromoContainer {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#venuePromoContainer h4,
+#venuePromoTitle,
+#venuePromoDesc {
+  text-align: center;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Center promo image */
+#venuePromoImage {
+  display: block !important;
+  margin: 12px auto !important; /* overrides inline margin: 8px 0px */
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+#venuePromoContainer .row {
+  justify-content: center !important;   /* centers the row with buttons */
+}
+#claimPromoBtn {
+  display: block;
+  margin: 10px auto;
+  text-align: center;
+}
+
+/* Centered “See Venue” link */
+.see-venue-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.see-venue-link {
+  color: var(--yellow);
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+.see-venue-link:hover {
+  color: var(--neon);
+}
+
+/* Adjust Click + Map buttons with centered See Venue */
+.venue-clickbar .button-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.venue-clickbar .button-row + .see-venue-wrap {
+  margin-top: 8px;
+}
+
+/* === Venue Info Section in Modal === */
+.venue-info {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.venue-name {
+  color: var(--neon);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.venue-meta {
+  opacity: 0.85;
+  font-size: 0.95rem;
+  color: var(--yellow);
+}
+.venue-desc {
+  opacity: 0.8;
+  font-style: italic;
+  color: #ccc;
+  margin-top: 4px;
+}
+
+/* === “See Promotion” link on venue cards === */
+.see-promo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+.see-promo-link {
+  color: var(--yellow);
+  text-decoration: underline;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.25s ease;
+}
+.see-promo-link:hover {
+  color: var(--neon);
+}
+
+/* =========================
+   VOTE CARD ALIGNMENT FIX
+   Appended by ChatGPT (keeps existing styles; overrides via cascade)
+   ========================= */
+.vote-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 340px; /* keep cards consistent height for aligned buttons */
+  gap: 6px;
+}
+
+.btn-vote {
+  margin-top: auto; /* push button to bottom of the card */
+  display: block;
+  width: 100%;
+}
+
+/* === Promo claim warning helpers === */
+.modal .modal-content .warn-strong { color:#fca5a5; font-weight:800; }
+.see-venue-link { text-decoration: underline; cursor: pointer; }
+.danger-btn { background: linear-gradient(135deg,#ef4444,#f97316); color:#fff; }
+.ghost-btn { background: transparent; border:1px solid var(--line); color:#e5e7eb; }
+
+
+/* ✨ Canonical Claims Remaining label (modal) */
+.promo-claims{
+  font-size:13px;
+  font-weight:800;
+  color: var(--yellow);
+  text-align:center;
+  margin-top: 6px;
+}
+
+
+/* Hide legacy claim text inside the promo modal to avoid duplicates */
+#venuePromoContainer .promo-scans{ display:none !important; }
+
+
+/* 🌙 No Claims Remaining Modal */
+.no-claims-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+.no-claims-inner {
+  background: #121318;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px 28px;
+  text-align: center;
+  box-shadow: 0 0 22px rgba(159,75,242,.4);
+}
+.no-claims-inner h3 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 24px;
+  color: var(--yellow);
+  margin-bottom: 6px;
+}
+.no-claims-inner p {
+  color: #d1d5db;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+
+/* ✨ Glowing Claim Promotion Button */
+#claimPromoBtn {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--coral), var(--neon));
+  color: #fff;
+  font-weight: 900;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 0 20px rgba(255, 215, 94, 0.45), 0 0 40px rgba(159, 75, 242, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  margin: 12px auto;
+}
+
+#claimPromoBtn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(255, 215, 94, 0.6), 0 0 60px rgba(159, 75, 242, 0.4);
+}
+
+@keyframes glowPulseButton {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255,215,94,0.45), 0 0 40px rgba(159,75,242,0.35);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255,215,94,0.7), 0 0 60px rgba(159,75,242,0.5);
+  }
+}
+
+#claimPromoBtn.glow {
+  animation: glowPulseButton 2s infinite ease-in-out;
+}
+
+
+/* === FIXED + CENTERED PANEL BEHAVIOR === */
+section.panel {
+  display: none;
+  position: absolute !important;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 1200px;
+  min-height: 100vh;
+  overflow-y: auto;
+  z-index: 1;
+}
+
+section.panel.active {
+  display: block !important;
+  z-index: 2;
+}

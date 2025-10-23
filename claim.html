@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Claim Promotion • Clicks</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root{ --black:#0C0C10; --line:#1f2126; --yellow:#FFD75E; --gray:#9CA3AF; --neon:#9F4BF2; --coral:#FF5A5F; }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{ margin:0; font-family:"Inter",system-ui,Arial; background:#0b0b12; color:#e5e7eb; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .wrap{ width:100%; max-width:560px; background:rgba(20,20,28,.85); border:1px solid var(--line); border-radius:20px; padding:22px 22px 26px; box-shadow:0 10px 30px rgba(0,0,0,.45); position:relative; }
+    .back{ position:absolute; left:12px; top:12px; width:36px; height:36px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.06); border:1px solid var(--line); cursor:pointer; transition:.2s; text-decoration:none; }
+    .back:hover{ transform:translateX(-2px); background:rgba(255,255,255,.12) }
+    .back::before{ content:""; display:block; width:10px; height:10px; border-left:2px solid #e5e7eb; border-bottom:2px solid #e5e7eb; transform:rotate(45deg); margin-left:4px; }
+    h1{ font-family:"Bebas Neue",system-ui; letter-spacing:.5px; font-size:38px; margin:4px 0 6px; color:var(--yellow); text-align:center; }
+    .subtitle{ text-align:center; opacity:.8; margin-bottom:12px; }
+    .card{ background:rgba(12,12,16,.8); border:1px solid var(--line); border-radius:16px; padding:16px; }
+    .promo-hero{ width:100%; height:260px; object-fit:cover; border-radius:12px; border:1px solid var(--line); display:none; margin-bottom:12px; }
+    #qrcode{ display:flex; align-items:center; justify-content:center; padding:12px; }
+    .code{ text-align:center; margin-top:8px; font-weight:800; letter-spacing:1px; background:#111318; border:1px dashed var(--line); padding:8px 10px; border-radius:10px; }
+    .footer-note{ font-size:12px; text-align:center; opacity:.7; margin-top:10px; }
+    .loading{ text-align:center; opacity:.8 }
+    .err{ color:#ff8088; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" aria-label="Back" onclick="history.back()"></a>
+    <div id="content">
+      <h1 id="title">Claim Promotion</h1>
+      <p class="subtitle" id="subtitle"></p>
+      <div class="card">
+        <div id="qrcode"></div>
+        <div id="code" class="code" style="display:none"></div>
+        <div id="foot" class="footer-note"></div>
+        <div id="loading" class="loading">Generating your claim…</div>
+        <div id="err" class="err" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (async function(){
+    const params = new URLSearchParams(location.search);
+    const promoId = params.get('promoId');
+    const titleEl = document.getElementById('title');
+    const subEl   = document.getElementById('subtitle');const codeEl  = document.getElementById('code');
+    const footEl  = document.getElementById('foot');
+    const loading = document.getElementById('loading');
+    const errEl   = document.getElementById('err');
+    const qrWrap  = document.getElementById('qrcode');
+
+    if (!promoId){ errEl.textContent='Missing promotion id.'; errEl.style.display='block'; loading.style.display='none'; return; }
+
+    try{
+      const res = await fetch('/api/promotions');
+      if (!res.ok) throw new Error('Unable to load promotions');
+      const promos = await res.json();
+      const promo = (Array.isArray(promos)?promos:[]).find(p => String(p.id)===String(promoId));
+      if (!promo) throw new Error('Promotion not found or inactive.');
+
+      titleEl.textContent = promo.title || 'Claim Promotion';
+      subEl.textContent = `Show this to your bartender at ${promo.venueName}. This way you can claim the “${promo.title}” promotion.`;
+
+      const userId = localStorage.getItem('clicks_user') || crypto.randomUUID();
+      localStorage.setItem('clicks_user', userId);
+      const claimRes = await fetch('/api/promotions/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ promoId: promo.id, userId }) });
+      const claimOut = await claimRes.json().catch(()=>({}));
+      if (!claimRes.ok){ throw new Error(claimOut.error || 'Could not claim promotion.'); }
+
+      // Show per-user QR and code from backend
+      if (claimOut.qr) {
+        var img = document.createElement('img'); img.alt='QR Code'; img.style.maxWidth='100%'; img.style.borderRadius='12px'; img.style.border='1px solid var(--line)'; img.src = claimOut.qr; qrWrap.innerHTML=''; qrWrap.appendChild(img);
+      }
+      if (claimOut.code) { codeEl.textContent = String(claimOut.code); codeEl.style.display='block'; }
+      loading.style.display='none';
+      footEl.textContent = 'Show this QR to staff. Once scanned, this code will be marked as used.';
+      footEl.textContent = 'Make sure the bartender scans the QR or types the code exactly as shown.';
+    }catch(err){
+      loading.style.display='none';
+      errEl.textContent = err.message || 'Something went wrong.';
+      errEl.style.display='block';
+    }
+  })();
+  </script>
+</body>
+</html>
