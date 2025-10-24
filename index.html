@@ -504,7 +504,21 @@
         <div class="promo-scans" id="venuePromoScans" style="margin-top:6px;opacity:.75"></div>
         </div>
 
-     
+      <div class="venue-clickbar" style="margin-top:12px;">
+        <div class="button-row">
+          <button class="click-btn" id="modalClickBtn">
+            <img src="Media/logo.png" class="click-icon" alt=""> Click
+          </button>
+          <a id="seePromoLink" class="see-venue-link" style="display:none;align-self:center;">See promotions</a>
+          <button class="map-btn" id="venueModalMap">Open in Map</button>
+        </div>
+        <div class="click-meter">
+          <div class="click-fill" id="modalClickFill" style="width:0%"></div>
+        </div>
+        <span class="click-count" id="modalClickCount">0 clicks</span>
+      </div>
+    </div>
+  </div>
 
   <!-- 📜 All Venues Modal -->
   <div class="modal" id="allVenuesModal" role="dialog" aria-modal="true" aria-labelledby="allVenuesTitle" aria-hidden="true">
@@ -562,5 +576,6 @@
       </div>
     </div>
     
+<button id='resetLeaderboardsBtn' class='btn danger' style='margin:10px;'>Reset Leaderboards</button>
 </body>
 </html>

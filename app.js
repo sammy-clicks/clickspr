@@ -1,3 +1,15 @@
+
+// === Scroll reset helper (fixes scroll-position glitch when switching panels) ===
+function resetScroll(){
+  try {
+    const list = document.getElementById("venueList");
+    if (list && typeof list.scrollTo === "function") {
+      list.scrollTo({ top: 0, behavior: "instant" });
+    }
+  } catch(_){}
+  try { window.scrollTo({ top: 0, behavior: "instant" }); } catch(_){}
+}
+
 /* =========================
    Boot helpers (splash)
 // ========================= */
@@ -1027,8 +1039,7 @@ function openVenueModal(v){
   paint();
   venueModal.__tick = setInterval(paint, 200);
 
-  if (mClickBtn){
-    mClickBtn.onclick = async (e)=>{
+  if (mClickBtn && !mClickBtn.hasAttribute('aria-disabled')) { mClickBtn.onclick = async (e)=>{
       e.stopPropagation();
       if(!isAdmin() && getProgressPct(v) < 100) return;
       v.clicks = (v.clicks||0)+1;
@@ -1449,7 +1460,8 @@ function show(el){ el.style.display="block"; }
 function hide(el){ el.style.display="none"; }
 function goHome(){ hide(zoneSelect); hide(venuesPanel); hide(adminPanel); hide(analyticsPanel); show(welcome); }
 function openZones(){ hide(welcome); hide(venuesPanel); hide(adminPanel); hide(analyticsPanel); show(zoneSelect); }
-function openVenues(){ hide(welcome); hide(zoneSelect); hide(adminPanel); hide(analyticsPanel); show(venuesPanel); renderVenues(); }
+function openVenues(){ hide(welcome); hide(zoneSelect); hide(adminPanel); hide(analyticsPanel); show(venuesPanel); renderVenues();
+  resetScroll(); }
 function openAdmin(){ hide(welcome); hide(zoneSelect); hide(venuesPanel); hide(analyticsPanel); show(adminPanel); }
 function openAnalytics(){ hide(welcome); hide(zoneSelect); hide(venuesPanel); hide(adminPanel); show(analyticsPanel); renderAnalytics(); }
 
@@ -2318,39 +2330,3 @@ if (resetLeaderboardsBtn) {
     }
   });
 }
-
-
-
-// === FIXED SCROLL BEHAVIOR ===
-// Hide all panels and show the target one
-function showPanel(panelId) {
-  document.querySelectorAll('section.panel').forEach(s => s.classList.remove('active'));
-  const target = document.getElementById(panelId);
-  if (target) {
-    target.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }
-}
-
-// Replace old display toggling with class-based system
-document.addEventListener('DOMContentLoaded', () => {
-  const zoneCards = document.querySelectorAll('.zone-card');
-  const seeAllButtons = document.querySelectorAll('.see-all');
-  const backToZones = document.getElementById('backToZones');
-  const backToHome = document.getElementById('backToHome');
-
-  zoneCards.forEach(card => {
-    card.addEventListener('click', () => {
-      showPanel('venues');
-    });
-  });
-
-  seeAllButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      showPanel('venues');
-    });
-  });
-
-  if (backToZones) backToZones.addEventListener('click', () => showPanel('zones'));
-  if (backToHome) backToHome.addEventListener('click', () => showPanel('home'));
-});

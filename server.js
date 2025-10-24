@@ -746,41 +746,6 @@ app.get("/api/promotions/summary", async (req, res) => {
   }
 });
 
-
-// ✅ Verify promotion by code (1-time use for QR scanning)
-app.get("/api/promotions/verify/:code", async (req, res) => {
-  try {
-    const { code } = req.params;
-    const promo = await getWithRetry("SELECT * FROM promotions WHERE code=?", [code]);
-
-    if (!promo)
-      return res.status(404).json({ valid: false, reason: "Invalid QR code" });
-    if (promo.active !== 1)
-      return res.json({ valid: false, reason: "Promotion inactive" });
-
-    // Check if already redeemed
-    const already = await getWithRetry(
-      "SELECT redeemed FROM promotion_claims WHERE code=? LIMIT 1",
-      [code]
-    );
-    if (already && already.redeemed) {
-      return res.json({ valid: false, reason: "Already redeemed" });
-    }
-
-    // Mark as redeemed
-    await runWithRetry(
-      `INSERT INTO promotion_claims (promoId, userId, venueId, code, redeemed, redeemed_at)
-       VALUES (?, ?, ?, ?, 1, strftime('%s','now'))`,
-      [promo.id, "venue", promo.venueId, code]
-    );
-
-    res.json({ valid: true, promo });
-  } catch (err) {
-    console.error("❌ Verify promo failed:", err);
-    res.status(500).json({ valid: false, reason: err.message });
-  }
-});
-
 // =================== CLEANUP ===================
 app.delete("/api/cleanup", async (req, res) => {
   try {
