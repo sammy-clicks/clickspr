@@ -334,7 +334,13 @@ async function saveVenue(v) {
             const fd = new FormData(); fd.append('promoImage', promoFile);
             const up = await fetch('/upload/promo', { method: 'POST', body: fd });
             const upOut = await (async () => { try { return await up.json(); } catch { return {}; } })();
-            if (up.ok && upOut?.path) promoImagePath = upOut.path;
+            if (up.ok && upOut?.path) {
+              promoImagePath = upOut.path;
+            } else {
+              const msg = upOut?.error || upOut?.message || ('Status ' + up.status);
+              console.error('Promo upload failed', msg, upOut);
+              alert('Promotion image upload failed: ' + msg);
+            }
           } catch (_) {}
         }
 
@@ -1521,16 +1527,22 @@ if(vImageFile){
       const fd = new FormData();
       fd.append('venueImage', file);
       const res = await fetch('/upload', { method:'POST', body: fd });
+      const out = await (async () => { try { return await res.json(); } catch { return {}; } })();
       if(res.ok){
-        const out = await res.json();
         const path = out.path || `Media/Venues/${file.name}`;
         const input = document.getElementById('vImage');
         if(input) input.value = path;
         return;
+      } else {
+        const msg = out?.error || out?.message || ('Status ' + res.status);
+        console.error('Upload failed', msg, out);
+        alert('Image upload failed: ' + msg);
+        const input = document.getElementById('vImage');
+        if(input) input.value = `Media/Venues/${file.name}`;
       }
-      const input = document.getElementById('vImage');
-      if(input) input.value = `Media/Venues/${file.name}`;
     }catch(err){
+      console.error('Upload error', err);
+      alert('Image upload error: ' + (err.message || err));
       const input = document.getElementById('vImage');
       if(input) input.value = `Media/Venues/${file.name}`;
     }

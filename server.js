@@ -14,6 +14,15 @@ const cloudinary = require("cloudinary").v2;
 const app = express();
 app.use(express.json());
 
+// Allow cross-origin requests (helps mobile/web clients and external test tools)
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: 'drppscucj',
@@ -936,25 +945,19 @@ app.post("/upload", upload.single("venueImage"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload_stream(
-      {
-        folder: 'clicks/venues',
-        resource_type: 'image',
-        public_id: `venue_${Date.now()}_${req.file.originalname.replace(/[^\w.-]/g, '_')}`
-      },
-      (error, result) => {
-        if (error) {
-          console.error('Cloudinary upload error:', error);
-          return res.status(500).json({ error: 'Upload failed: ' + error.message });
-        }
-        
-        // Return the Cloudinary URL (this will be rewritten by media-config.js)
-        res.json({ path: result.secure_url });
+    // Upload to Cloudinary using base64 data URI (avoids needing stream helpers)
+    const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    cloudinary.uploader.upload(dataUri, {
+      folder: 'clicks/venues',
+      resource_type: 'image',
+      public_id: `venue_${Date.now()}_${req.file.originalname.replace(/[^\\w.-]/g, '_')}`
+    }, (error, result) => {
+      if (error) {
+        console.error('Cloudinary upload error:', error);
+        return res.status(500).json({ error: 'Upload failed: ' + (error.message || error) });
       }
-    );
-    
-    result.end(req.file.buffer);
+      res.json({ path: result.secure_url });
+    });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed: ' + err.message });
@@ -966,25 +969,19 @@ app.post("/upload/promo", upload.single("promoImage"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload_stream(
-      {
-        folder: 'clicks/promotions',
-        resource_type: 'image',
-        public_id: `promo_${Date.now()}_${req.file.originalname.replace(/[^\w.-]/g, '_')}`
-      },
-      (error, result) => {
-        if (error) {
-          console.error('Cloudinary upload error:', error);
-          return res.status(500).json({ error: 'Upload failed: ' + error.message });
-        }
-        
-        // Return the Cloudinary URL
-        res.json({ path: result.secure_url });
+    // Upload to Cloudinary using base64 data URI
+    const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    cloudinary.uploader.upload(dataUri, {
+      folder: 'clicks/promotions',
+      resource_type: 'image',
+      public_id: `promo_${Date.now()}_${req.file.originalname.replace(/[^\\w.-]/g, '_')}`
+    }, (error, result) => {
+      if (error) {
+        console.error('Cloudinary upload error:', error);
+        return res.status(500).json({ error: 'Upload failed: ' + (error.message || error) });
       }
-    );
-    
-    result.end(req.file.buffer);
+      res.json({ path: result.secure_url });
+    });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed: ' + err.message });

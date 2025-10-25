@@ -230,7 +230,7 @@
 
     <div class="field">
       <label for="vImageFile">Image</label>
-      <input type="file" id="vImageFile" accept="image/*">
+  <input type="file" id="vImageFile" accept="image/*" capture="environment">
       <input type="text" id="vImage" placeholder="Cloudinary URL or Media/Venues/yourfile.jpg" autocomplete="off">
       <small class="hint">Upload to Cloudinary or paste a URL. Uploads are saved to your Cloudinary account.</small>
     </div>
@@ -318,7 +318,7 @@
     </div>
     <div class="field">
       <label for="vPromoImage">Promotion Image</label>
-      <input type="file" id="vPromoImage" accept="image/*">
+  <input type="file" id="vPromoImage" accept="image/*" capture="environment">
       <input type="text" id="vPromoImagePath" placeholder="Cloudinary URL or Media/Promotions/yourfile.jpg" autocomplete="off">
       <div class="muted">Upload to Cloudinary or paste a URL. Uploads are saved to your Cloudinary account.</div>
       <img id="vPromoPreview" style="display:none;margin-top:8px;max-width:260px;border-radius:10px;border:1px solid var(--line)" alt="">
