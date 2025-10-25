@@ -13,9 +13,14 @@ const MEDIA_BASE = 'https://res.cloudinary.com/drppscucj/image/upload/clicks/';
 // hosted URL.
 const MEDIA_MAP = {
   // Local path : Full CDN URL
-  'Media/vsj.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407027/vsj_drf2lg.png'
-  // Add other mappings like:
-  // 'Media/logo.png': 'https://res.cloudinary.com/<cloud>/image/upload/v123/logo_abcd.png'
+  'Media/vsj.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407027/vsj_drf2lg.png',
+  'Media/loiza.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407027/loiza_xbmqxz.png',
+  'Media/placita.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407027/placita_gakixy.png',
+  'Media/condado.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407024/condado_jv3p7o.png',
+  'Media/cerra.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407022/cerra_ibt9fn.png',
+  'Media/crowd.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407022/crowd_d4oto8.png',
+  'Media/logo.png': 'https://res.cloudinary.com/drppscucj/image/upload/v1761407020/logo_s05ued.png',
+  'Media/home.mp4': 'https://res.cloudinary.com/drppscucj/video/upload/v1761407032/home_g9bpcf.mp4'
 };
 
 // Resolve a path that may be 'Media/...' into a CDN URL.
