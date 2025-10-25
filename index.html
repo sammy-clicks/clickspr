@@ -44,6 +44,8 @@
     .promo-code{text-align:center;font-weight:700;color:var(--yellow)}
     .promo-scans{text-align:center;font-size:13px;color:var(--gray)}
   </style>
+
+<style>.see-venue-link{display:none !important;visibility:hidden}</style>
 </head>
 <body>
 
@@ -176,6 +178,7 @@
 
   <!-- 🛠️ Admin Panel -->
   <section id="adminPanel" class="panel admin-only" style="display:none">
+    <div id="adminForm">
     <h2 class="panel-title">Admin Panel — Manage Venues</h2>
     <input type="hidden" id="vId">
 
@@ -468,6 +471,7 @@
     </div>
   </div>
 
+  
   <!-- 🏠 Venue Detail Modal (fixed layout: Zone / Category • Price / Description) -->
   <div class="modal" id="venueModal" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle" aria-hidden="true">
     <div class="modal-inner">
@@ -476,7 +480,7 @@
       <h3 id="venueModalTitle"></h3>
       <img id="venueModalImage" src="" alt="" style="display:block;border-radius:12px;margin-bottom:10px;">
 
-      <!-- 🟢 Unified info block (always visible if data exists) -->
+      <!-- 🟢 Unified info block -->
       <div id="venueInfoBlock" style="margin-top:8px;line-height:1.5;">
         <p id="venueInfoZone" style="font-weight:600;color:var(--yellow);margin-bottom:4px;">
           <span id="venueModalZone"></span>
@@ -485,40 +489,64 @@
           <span id="venueModalCategory"></span> • <span id="venueModalPrice"></span>
         </p>
         <p id="venueModalExpect" style="font-style:italic;color:#d1d5db;margin-bottom:10px;"></p>
+        
+        <!-- Promotion link section moved to bottom of modal (inserted later) -->
       </div>
 
       <!-- Promotion Info -->
-      <div id="venuePromoContainer" style="display:none;margin-top:15px;">
+      <div id="venuePromoContainer" style="display:none !important" style="display:none;margin-top:15px;">
         <h4 style="color:var(--yellow);">Active Promotion</h4>
         <img id="venuePromoImage" alt="Promotion" style="display:none;margin:8px 0;max-width:100%;border-radius:12px;border:1px solid var(--line)">
         <p id="venuePromoTitle" style="font-weight:800;margin:6px 0 2px;"></p>
         <p id="venuePromoDesc" style="opacity:.9;margin-bottom:8px;"></p>
         <div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0;">
           <button class="map-btn" id="venuePromoMap">Open in Map</button>
-          <button class="click-btn" id="claimPromoBtn">Claim promotion</button>
-        
-    <p id="venuePromoClaims" class="promo-claims" style="margin-top:6px;"></p>
-    </div>
+          <button class="click-btn" id="venueClaimBtn">Claim promotion</button>
+          <p id="venuePromoClaims" class="promo-claims" style="margin-top:6px;"></p>
+        </div>
         <img id="venuePromoQR" class="promo-qr" src="" alt="QR Code" style="display:none">
         <div class="promo-code" id="venuePromoCode" style="display:none"></div>
         <div class="promo-scans" id="venuePromoScans" style="margin-top:6px;opacity:.75"></div>
-        </div>
+      </div>
 
       <div class="venue-clickbar" style="margin-top:12px;">
         <div class="button-row">
-          <button class="click-btn" id="modalClickBtn">
-            <img src="Media/logo.png" class="click-icon" alt=""> Click
-          </button>
+          <button class="click-btn" id="venueClickBtn"><img src="Media/logo.png" class="click-icon" alt=""> Click</button>
           <a id="seePromoLink" class="see-venue-link" style="display:none;align-self:center;">See promotions</a>
-          <button class="map-btn" id="venueModalMap">Open in Map</button>
+          <button class="map-btn" id="venueMapBtn">Open in Map</button>
         </div>
-        <div class="click-meter">
-          <div class="click-fill" id="modalClickFill" style="width:0%"></div>
+        <div class="click-meter" id="venueClickMeter">
+          <div class="click-fill" id="venueClickFill" style="width:0%"></div>
         </div>
-        <span class="click-count" id="modalClickCount">0 clicks</span>
+        <span class="click-count" id="venueClickCount">0 clicks</span>
+      </div>
+      <!-- Promotion Link Section (placed at bottom of venue modal) -->
+      <div class="promo-link-container">
+        <a href="#" id="showPromoBtn" class="see-promo-link" style="display: none;">See Promotion</a>
+        <p class="clicks-copyright" style="text-align:center;margin-top:8px;">Clicks © 2025. All rights reserved.</p>
       </div>
     </div>
   </div>
+
+  <div class="venue-clickbar" style="margin-top:12px;">
+        <div class="button-row">
+          <button class="click-btn" id="promoClickBtn"><img src="Media/logo.png" class="click-icon" alt=""> Click</button>
+          <a id="seeVenueLink" class="see-venue-link" style="display:none;align-self:center;">See venue</a>
+          <button class="map-btn" id="promoMapBtn">Open in Map</button>
+        </div>
+        <div class="click-meter" id="promoClickMeter">
+          <div class="click-fill" id="promoClickFill" style="width:0%"></div>
+        </div>
+        <span class="click-count" id="promoClickCount">0 clicks</span>
+      </div>
+      <!-- Promo modal bottom link area -->
+      <div class="promo-link-container">
+        <a href="#" id="promoSeeVenue" class="see-promo-link" style="display:none;">See Venue</a>
+        <p class="clicks-copyright" style="text-align:center;margin-top:8px;">Clicks © 2025. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+
 
   <!-- 📜 All Venues Modal -->
   <div class="modal" id="allVenuesModal" role="dialog" aria-modal="true" aria-labelledby="allVenuesTitle" aria-hidden="true">
@@ -539,8 +567,43 @@
 </div><!-- /#app -->
 
 <!-- 📦 Libraries -->
+
+  <!-- 🎟 Promotion Detail Modal (Aesthetic: Active Promotion card) -->
+  <div class="modal" id="promoModal" role="dialog" aria-modal="true" aria-labelledby="promoModalTitle" aria-hidden="true" style="display:none;">
+    <div class="modal-inner" style="max-width:720px;">
+      <div class="close-x" id="promoClose" aria-label="Close">✕</div>
+
+      <h3 id="promoVenueHeading" class="venue-title" style="margin-bottom:4px;"></h3>
+      <p style="color:var(--yellow);font-weight:800;margin:0 0 10px;">Active Promotion</p>
+
+      <img id="promoImage" alt="Promotion" style="display:block;margin:8px auto;max-width:100%;border-radius:14px;border:1px solid var(--line)">
+      
+      <div style="text-align:center;margin-top:10px;">
+        <div id="promoTitle" class="venue-title" style="font-size:20px;margin:0;"></div>
+        <div id="promoDesc" class="venue-desc" style="margin:6px auto 10px;max-width:580px;"></div>
+      </div>
+
+      <div class="venue-clickbar" style="margin-top:12px;">
+        <div class="button-row">
+          <button class="click-btn" id="promoClickBtn"><img src="Media/logo.png" class="click-icon" alt=""> Click</button>
+          <a id="promoClaimBtn" class="btn glow" href="#" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">Claim promotion</a>
+          <button class="map-btn" id="promoMapBtn">Open in Map</button>
+        </div>
+        <div class="click-meter" id="promoClickMeter">
+          <div class="click-fill" id="promoClickFill" style="width:0%"></div>
+        </div>
+        <span class="click-count" id="promoClickCount">0 clicks</span>
+      </div>
+      <!-- Promo modal bottom link area -->
+      <div class="promo-link-container">
+        <a href="#" id="promoSeeVenue" class="see-promo-link" style="display:none;">See Venue</a>
+        <p class="clicks-copyright" style="text-align:center;margin-top:8px;">Clicks © 2025. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 
 <!-- 🧠 Modal Closing Helpers -->
 <script>
@@ -576,6 +639,6 @@
       </div>
     </div>
     
-<button id='resetLeaderboardsBtn' class='btn danger' style='margin:10px;'>Reset Leaderboards</button>
+
 </body>
 </html>

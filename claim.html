@@ -60,7 +60,7 @@
       if (!promo) throw new Error('Promotion not found or inactive.');
 
       titleEl.textContent = promo.title || 'Claim Promotion';
-      subEl.textContent = `Show this to your bartender at ${promo.venueName}. This way you can claim the “${promo.title}” promotion.`;
+  subEl.textContent = `Show this to your bartender. This way you can claim the “${promo.title}” promotion.`;
 
       const userId = localStorage.getItem('clicks_user') || crypto.randomUUID();
       localStorage.setItem('clicks_user', userId);

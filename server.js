@@ -565,46 +565,29 @@ deactivateExpiredPromotions();
 setInterval(deactivateExpiredPromotions, 30 * 60 * 1000);
 
 // GET active promotions (active=1 AND within last 7 days)
-
-app.get("/api/promotions", (req, res) => {
-  const runQuery = () => {
-    allWithRetry(`
-      SELECT p.id, p.title, p.description, p.image, p.code, p.qr, p.claims, p.created_at, p.venueId AS venueId,
-             v.name  AS venueName, v.zone AS venueZone, v.image AS venueImage
+app.get("/api/promotions", async (req, res) => {
+  try {
+    const sevenDaysAgo = Math.floor(Date.now() / 1000) - SEVEN_DAYS_SEC;
+    const includeInactive = req.query && (req.query.includeInactive === '1' || req.query.includeInactive === 'true');
+    // If includeInactive is truthy, return both active and inactive promos (admins use this)
+    const sql = `
+      SELECT 
+        p.*,
+        v.name as venueName,
+        v.id as venueId,
+        v.zone as venueZone,
+        v.image as venueImage
       FROM promotions p
-      JOIN venues v ON v.id = p.venueId
-      WHERE p.active = 1
-      ORDER BY p.created_at DESC
-    `).then(rows => res.json(rows))
-     .catch(err => {
-        const msg = (err && err.message) || String(err);
-        if (/no such column: image/i.test(msg)){
-          // Auto-migrate then retry once
-          ensurePromoImageColumn((e2)=>{
-            if (e2) return res.status(500).json({ error: e2.message || 'migration failed' });
-            allWithRetry(`
-              SELECT p.id, p.title, p.description, p.image, p.code, p.qr, p.claims, p.created_at, p.venueId AS venueId,
-                     v.name  AS venueName, v.zone AS venueZone, v.image AS venueImage
-              FROM promotions p
-              JOIN venues v ON v.id = p.venueId
-              WHERE p.active = 1
-              ORDER BY p.created_at DESC
-            `).then(rows2 => res.json(rows2))
-             .catch(e3 => res.status(500).json({ error: e3.message }));
-          });
-        } else {
-          res.status(500).json({ error: msg });
-        }
-     });
-  };
-  if (!__schemaReady) {
-    ensurePromoImageColumn(()=> runQuery());
-  } else {
-    runQuery();
+      INNER JOIN venues v ON v.id = p.venueId
+      WHERE p.created_at >= ? ${includeInactive ? '' : 'AND p.active = 1'}
+    `;
+    const promos = await allWithRetry(sql, [sevenDaysAgo], includeInactive ? "get-promos-with-inactive" : "get-active-promos");
+    res.json(promos);
+  } catch (err) {
+    console.error("Error getting promotions:", err);
+    res.status(500).json({ error: "Could not get promotions" });
   }
 });
-
-
 
 // POST /api/promotions — create (or replace) a promotion for a venue
 // Body: { venueId, title, description }
@@ -705,18 +688,73 @@ app.post("/api/promotions/claim", async (req, res) => {
       return res.status(429).json({ error: "Already claimed today" });
     }
 
-    // Record claim
+    // Record claim with unique code
+    const uniqueCode = makeShortCode(8);
+    const claimQR = await QRCode.toDataURL(uniqueCode, { errorCorrectionLevel: "M", margin: 1, scale: 6 });
+    
     await runWithRetry(`
-      INSERT INTO promotion_claims (promoId, userId, venueId, claimed_at)
-      VALUES (?, ?, ?, strftime('%s','now'))
-    `, [promoId, userId, promo.venueId]);
+      INSERT INTO promotion_claims (promoId, userId, venueId, claimed_at, code, qr)
+      VALUES (?, ?, ?, strftime('%s','now'), ?, ?)
+    `, [promoId, userId, promo.venueId, uniqueCode, claimQR]);
 
     // Bump counter
     await runWithRetry(`UPDATE promotions SET claims = claims + 1 WHERE id=?`, [promoId]);
 
-    res.json({ claimed: true, qr: promo.qr, code: promo.code });
+    res.json({ claimed: true, qr: claimQR, code: uniqueCode });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Verify a promotion code (for venue staff to scan)
+app.get("/api/promotions/verify/:code", async (req, res) => {
+  const { code } = req.params;
+  if (!code) return res.status(400).json({ valid: false, reason: "Code required" });
+
+  try {
+    // Find the claim by code
+    const claim = await getWithRetry(`
+      SELECT pc.*, p.title, p.description, p.active, p.created_at as promo_created_at, v.name as venueName
+      FROM promotion_claims pc
+      JOIN promotions p ON p.id = pc.promoId
+      JOIN venues v ON v.id = pc.venueId
+      WHERE pc.code = ?
+    `, [code]);
+
+    if (!claim) {
+      return res.json({ valid: false, reason: "Invalid code" });
+    }
+
+    // Check if already redeemed
+    if (claim.redeemed === 1) {
+      return res.json({ valid: false, reason: "Code already used" });
+    }
+
+    // Check if promotion is active and not expired (7 days)
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (claim.active !== 1 || (nowSec - claim.promo_created_at) > SEVEN_DAYS_SEC) {
+      return res.json({ valid: false, reason: "Promotion expired or inactive" });
+    }
+
+    // Mark as redeemed
+    await runWithRetry(`
+      UPDATE promotion_claims 
+      SET redeemed = 1, redeemed_at = strftime('%s','now') 
+      WHERE id = ?
+    `, [claim.id]);
+
+    res.json({ 
+      valid: true, 
+      reason: `${claim.title} at ${claim.venueName}`,
+      promotion: {
+        title: claim.title,
+        description: claim.description,
+        venueName: claim.venueName
+      }
+    });
+  } catch (err) {
+    console.error("Verification error:", err);
+    res.status(500).json({ valid: false, reason: "Server error" });
   }
 });
 
@@ -726,6 +764,41 @@ app.delete("/api/promotions/reset", async (req, res) => {
     await runWithRetry(`DELETE FROM promotion_claims`);
     const r = await runWithRetry(`UPDATE promotions SET claims = 0`);
     res.json({ reset: true, promotionsUpdated: r.changes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete/deactivate promotions for a venue
+app.delete("/api/promotions/by-venue/:venueId", async (req, res) => {
+  const { venueId } = req.params;
+  if (!venueId) return res.status(400).json({ error: "venueId required" });
+  
+  try {
+    console.log('➡️ DELETE /api/promotions/by-venue', { venueId, query: req.query });
+    await runWithRetry(`UPDATE promotions SET active = 0 WHERE venueId = ?`, [venueId]);
+    res.json({ deactivated: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Toggle promotion active state (flip when no body supplied)
+app.put("/api/promotions/toggle/:promoId", async (req, res) => {
+  const { promoId } = req.params;
+  const { active } = req.body || {};
+  if (!promoId) return res.status(400).json({ error: "promoId required" });
+  try {
+    console.log('➡️ PUT /api/promotions/toggle', { promoId, body: req.body, query: req.query });
+    if (typeof active === 'undefined') {
+      // Flip current active state
+      await runWithRetry(`UPDATE promotions SET active = CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id = ?`, [promoId]);
+    } else {
+      await runWithRetry(`UPDATE promotions SET active = ? WHERE id = ?`, [active ? 1 : 0, promoId]);
+    }
+    // Return updated row
+    const row = await getWithRetry(`SELECT id, venueId, title, description, image, active FROM promotions WHERE id = ?`, [promoId]);
+    res.json({ updated: true, promo: row });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

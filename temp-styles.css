@@ -1,0 +1,29 @@
+/* Promotion card and claim button styles */
+.claim-promo-btn {
+  background: linear-gradient(90deg,var(--coral),var(--neon));
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin: 0 auto;
+}
+
+.claim-promo-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(159,75,242,0.3);
+}
+
+.promo-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 10px;
+}
+
+.promo-card .venue-desc {
+  flex: 1;
+  margin-bottom: 10px;
+}

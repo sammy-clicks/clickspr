@@ -131,8 +131,8 @@ function renderMap(venues){
       const icon = v.isPick ? pickIcon : defaultIcon;
       const popupHtml = `
         <div class="map-popup">
-          ${v.isPick ? `<div class="pick-badge">Pick of the Week</div>` : ""}
-          <b>${v.name||""}</b>
+          ${v.isPick ? `<div class='pick-badge'>Pick of the Week</div>` : ""}
+          <a href="#" class="venue-popup-link" data-venue-id="${v.id}" style="color:#FFD75E;text-decoration:underline;font-weight:700;">${v.name||""}</a>
           <div class="venue-meta">${v.zone||""} • ${v.price||""}</div>
           <div class="venue-extra">${v.category||"Bar"} • ${v.clicks||0} clicks</div>
           <button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}','_blank')">
@@ -161,6 +161,18 @@ function renderMap(venues){
     }
   }catch(e){}
 }
+
+// Listen for venue name clicks in popups
+document.addEventListener('click', function(e) {
+  const link = e.target.closest('.venue-popup-link');
+  if (link) {
+    e.preventDefault();
+    const venueId = link.getAttribute('data-venue-id');
+    // Store venue ID in sessionStorage and redirect to index.html
+    sessionStorage.setItem('openVenueId', venueId);
+    window.location.href = 'index.html';
+  }
+});
 
 // Run it
 loadVenues();

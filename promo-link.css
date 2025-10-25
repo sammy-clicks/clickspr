@@ -1,0 +1,40 @@
+.promo-link-container {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  text-align: center;
+}
+
+.see-promo-link {
+  display: inline-block;
+  color: var(--yellow);
+  text-decoration: underline;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 15px;
+}
+
+.see-promo-link:hover {
+  color: var(--neon);
+  text-shadow: 0 0 8px rgba(159, 75, 242, 0.4);
+}
+
+.see-promo-link.disabled {
+  color: #666;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.no-promo-message {
+  color: #888;
+  font-size: 0.9em;
+  margin: 10px 0;
+  font-style: italic;
+}
+
+.clicks-copyright {
+  color: #666;
+  font-size: 0.8em;
+  margin-top: 10px;
+}

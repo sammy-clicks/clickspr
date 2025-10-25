@@ -8,6 +8,52 @@
   --pickGreen:#10b981;
   --mapGreen1:#34d399;
   --mapGreen2:#059669;
+
+/* Promo modal claim button centered */
+#promoClaimBtn {
+  display: inline-block !important;
+  margin: 12px auto !important;
+  text-align: center;
+}
+
+/* See Venue link style inside promo cards */
+.see-venue-link {
+  text-decoration: underline;
+  color: var(--neon);
+  font-weight: 700;
+}
+
+/* Tidy up promo-card internals so claim button sits centered */
+.promo-card {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-bottom: 48px;
+}
+.promo-card .claim-promo-btn { margin: 0 auto; }
+
+/* Admin promo buttons layout */
+.promo-card .promo-delete-btn,
+.promo-card .promo-toggle-btn {
+  display: block;
+  width: 90%;
+  margin: 8px auto 0 auto;
+  z-index: 2;
+  position: relative;
+  pointer-events: auto;
+}
+.promo-card .promo-delete-btn + .promo-toggle-btn {
+  margin-top: 8px;
+}
+
+/* Prevent promo-card click from overlaying buttons */
+.promo-card button {
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.promo-venue-name{font-size:13px;color:var(--yellow);font-weight:700;margin-top:6px;text-align:center}
+.promo-card .venue-meta-line{font-size:12px;color:#cbd5e1;margin-top:8px;text-align:center}
 }
 
 /* RESET */
@@ -175,6 +221,80 @@ input, select, textarea{width:100%;padding:10px;border-radius:10px;border:1px so
 
 /* VENUE DETAIL MODAL */
 #venueModalImage{width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin-bottom:12px}
+
+/* Promotion Link Styles */
+.promo-link-container {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  text-align: center;
+}
+
+/* Venue modal: keep promo link at visual bottom of the modal */
+#venueModal .modal-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+}
+
+#venueModal .promo-link-container {
+  margin-top: auto; /* push to bottom */
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.see-promo-link {
+  display: inline-block;
+  text-decoration: underline;
+  color: var(--neon);
+  font-weight: 800;
+  margin: 10px auto;
+}
+
+/* Promo modal: place bottom link area */
+#promoModal .modal-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+}
+#promoModal .promo-link-container {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.show-promo-button {
+  background: linear-gradient(135deg, var(--coral) 0%, var(--neon) 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 15px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(159, 75, 242, 0.25);
+}
+
+.show-promo-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(159, 75, 242, 0.4);
+}
+
+.show-promo-button:active {
+  transform: translateY(1px);
+}
+
+.clicks-copyright {
+  color: #666;
+  font-size: 0.8em;
+  margin-top: 10px;
+}
 #venueModalTitle{font-family:"Bebas Neue",sans-serif;font-size:28px;margin-bottom:8px;background:linear-gradient(90deg,var(--coral),var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 #venueModalExpect{font-style:italic;margin-bottom:12px}
 #venueModalZone{color:var(--yellow);font-weight:600}
@@ -918,4 +1038,28 @@ canvas{max-width:100%;height:300px !important}
   color: #d1d5db;
   margin-bottom: 14px;
   font-size: 15px;
+}
+
+
+
+/* ======== Clickbar/Button Spacing & Claim Button Centering (Fix) ======== */
+/* Tighten spacing inside the clickbar (between button-row and meter) */
+.venue-card .venue-clickbar { gap: 3px !important; }
+
+/* Remove any extra space added by the button row */
+.venue-card .button-row { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+
+/* Ensure the meter sits snug right under the buttons */
+.venue-card .click-meter { margin-top: 0 !important; }
+.venue-card .button-row + .click-meter { margin-top: 2px !important; }
+
+/* Robust centering for the Claim Promotion button in the promo modal */
+#venuePromoContainer #claimPromoBtn,
+#venuePromoContainer .promo-claim-btn,
+#venuePromoContainer a.btn.glow.claim,
+#venuePromoContainer .btn.glow#claimPromoBtn {
+  display: block !important;
+  margin: 12px auto !important;
+  text-align: center !important;
+  justify-content: center !important;
 }
