@@ -27,6 +27,10 @@ const MEDIA_MAP = {
 window.resolveMedia = function(path){
   if (!path) return path;
   if (typeof path !== 'string') return path;
+  
+  // If it's already a full URL (Cloudinary or other CDN), return as-is
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  
   // If there's an explicit map for this path, return it (covers renamed uploads)
   if (MEDIA_MAP && MEDIA_MAP[path]) return MEDIA_MAP[path];
 

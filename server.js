@@ -1,5 +1,7 @@
 // server.js — Clicks Beta (SQLite + Promotions fixed to match frontend)
 // --------------------------------------------------
+require('dotenv').config(); // Load environment variables from .env file
+
 const express = require("express");
 const multer  = require("multer");
 const path    = require("path");
@@ -7,9 +9,17 @@ const fs      = require("fs");
 const sqlite3 = require("sqlite3").verbose();
 const QRCode  = require("qrcode");
 const { webcrypto } = require("crypto");
+const cloudinary = require("cloudinary").v2;
 
 const app = express();
 app.use(express.json());
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: 'drppscucj',
+  api_key: process.env.CLOUDINARY_API_KEY || 'your_api_key_here',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'your_api_secret_here'
+});
 
 // ✅ Unified Content Security Policy (enables Chart.js, XLSX, inline scripts for now)
 app.use((req, res, next) => {
@@ -912,48 +922,73 @@ app.delete("/api/admin-logins/reset", async (req, res) => {
 });
 
 
-// =================== IMAGE UPLOAD ===================
-const uploadDir = path.join(__dirname, "Media", "Venues");
-fs.mkdirSync(uploadDir, { recursive: true });
-const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, uploadDir),
-  filename: (_, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.\-]/g, "_");
-    const ext = path.extname(safe) || ".jpg";
-    const base = path.basename(safe, ext);
-    cb(null, `${Date.now()}_${base}${ext}`);
-  }
-});
+// =================== IMAGE UPLOAD (CLOUDINARY) ===================
+// Use memory storage for multer since we'll upload to Cloudinary
+const memoryStorage = multer.memoryStorage();
 const upload = multer({
-  storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (_, file, cb) => cb(null, /^image\//.test(file.mimetype))
-});
-app.post("/upload", upload.single("venueImage"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  res.json({ path: "Media/Venues/" + req.file.filename });
 });
 
-// --- Separate uploader for Promotions (NOT nested) ---
-const uploadDirPromo = path.join(__dirname, "Media", "Promotions");
-fs.mkdirSync(uploadDirPromo, { recursive: true });
-const storagePromo = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, uploadDirPromo),
-  filename: (_, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.\-]/g, "_");
-    const ext = path.extname(safe) || ".jpg";
-    const base = path.basename(safe, ext);
-    cb(null, `${Date.now()}_${base}${ext}`);
+// Venue image upload endpoint
+app.post("/upload", upload.single("venueImage"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload_stream(
+      {
+        folder: 'clicks/venues',
+        resource_type: 'image',
+        public_id: `venue_${Date.now()}_${req.file.originalname.replace(/[^\w.-]/g, '_')}`
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          return res.status(500).json({ error: 'Upload failed: ' + error.message });
+        }
+        
+        // Return the Cloudinary URL (this will be rewritten by media-config.js)
+        res.json({ path: result.secure_url });
+      }
+    );
+    
+    result.end(req.file.buffer);
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
   }
 });
-const uploadPromo = multer({
-  storage: storagePromo,
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (_, file, cb) => cb(null, /^image\//.test(file.mimetype))
-});
-app.post("/upload/promo", uploadPromo.single("promoImage"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  res.json({ path: "Media/Promotions/" + req.file.filename });
+
+// Promotion image upload endpoint
+app.post("/upload/promo", upload.single("promoImage"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload_stream(
+      {
+        folder: 'clicks/promotions',
+        resource_type: 'image',
+        public_id: `promo_${Date.now()}_${req.file.originalname.replace(/[^\w.-]/g, '_')}`
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          return res.status(500).json({ error: 'Upload failed: ' + error.message });
+        }
+        
+        // Return the Cloudinary URL
+        res.json({ path: result.secure_url });
+      }
+    );
+    
+    result.end(req.file.buffer);
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
+  }
 });
 // =================== STATIC FILES ===================
 app.use('/Media', express.static(path.join(__dirname, 'Media')));
