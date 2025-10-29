@@ -1,6 +1,18 @@
 import dotenv from 'dotenv';
 dotenv.config(); // Load environment variables from .env file
 
+// Early runtime diagnostics — helps when deploy logs are empty
+console.log('🔎 server.js loaded, NODE_ENV=' + (process.env.NODE_ENV || 'undefined') + ', PORT=' + (process.env.PORT || 'undefined'));
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err && (err.stack || err.message || String(err)));
+  // give logs a moment to flush
+  setTimeout(() => process.exit(1), 100);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection:', reason && (reason.stack || reason.message || String(reason)));
+  setTimeout(() => process.exit(1), 100);
+});
+
 import express from "express";
 import multer from "multer";
 import path from "path";
