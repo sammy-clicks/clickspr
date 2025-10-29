@@ -25,7 +25,7 @@ app.use((req, res, next) => {
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: 'drppscucj',
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'drppscucj',
   api_key: process.env.CLOUDINARY_API_KEY || 'your_api_key_here',
   api_secret: process.env.CLOUDINARY_API_SECRET || 'your_api_secret_here'
 });
@@ -39,8 +39,10 @@ app.use((req, res, next) => {
     "script-src-attr 'self' 'unsafe-inline'",
     "style-src 'self' https: 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https: data: https://fonts.gstatic.com",
-    "img-src 'self' https: data: blob:",
-    "connect-src 'self' https: data: blob:",
+    // allow Cloudinary image CDN
+    "img-src 'self' https: data: blob: https://res.cloudinary.com",
+    // allow connections to Cloudinary API if front-end uses it directly
+    "connect-src 'self' https: data: blob: https://api.cloudinary.com https://res.cloudinary.com",
     "media-src 'self' https: data: blob:",
     "worker-src 'self' blob:",
     "base-uri 'self'",
@@ -279,6 +281,10 @@ async function ensureClaimColumns(){
 app.get("/api/venues", async (req, res) => {
   try {
     const rows = await allWithRetry("SELECT * FROM venues ORDER BY clicks DESC, name ASC");
+    // Auto-migrate local Media images to Cloudinary on-the-fly so front-end sees CDN URLs
+    for (let i = 0; i < rows.length; i++){
+      try{ rows[i] = await ensureVenueImageUrl(rows[i]); }catch(e){ /* non-fatal */ }
+    }
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -601,6 +607,11 @@ app.get("/api/promotions", async (req, res) => {
       WHERE p.created_at >= ? ${includeInactive ? '' : 'AND p.active = 1'}
     `;
     const promos = await allWithRetry(sql, [sevenDaysAgo], includeInactive ? "get-promos-with-inactive" : "get-active-promos");
+    // Auto-migrate any local images referenced by the promo or its venue
+    for (let i = 0; i < promos.length; i++){
+      try{ promos[i] = await ensurePromoImageUrl(promos[i]); }catch(e){}
+      try{ if (promos[i] && promos[i].venueImage) promos[i].venueImage = (await ensureVenueImageUrl({ id: promos[i].venueId, image: promos[i].venueImage })).image; }catch(e){}
+    }
     res.json(promos);
   } catch (err) {
     console.error("Error getting promotions:", err);
@@ -940,51 +951,103 @@ const upload = multer({
   fileFilter: (_, file, cb) => cb(null, /^image\//.test(file.mimetype))
 });
 
-// Venue image upload endpoint
-app.post("/upload", upload.single("venueImage"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    
-    // Upload to Cloudinary using base64 data URI (avoids needing stream helpers)
-    const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    cloudinary.uploader.upload(dataUri, {
-      folder: 'clicks/venues',
-      resource_type: 'image',
-      public_id: `venue_${Date.now()}_${req.file.originalname.replace(/[^\\w.-]/g, '_')}`
-    }, (error, result) => {
-      if (error) {
-        console.error('Cloudinary upload error:', error);
-        return res.status(500).json({ error: 'Upload failed: ' + (error.message || error) });
-      }
-      res.json({ path: result.secure_url });
+// Helper: upload a data URI to Cloudinary returning a Promise
+function uploadDataUriToCloudinary(dataUri, opts = {}){
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload(dataUri, opts, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
     });
-  } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed: ' + err.message });
-  }
-});
+  });
+}
 
-// Promotion image upload endpoint
-app.post("/upload/promo", upload.single("promoImage"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    
-    // Upload to Cloudinary using base64 data URI
-    const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    cloudinary.uploader.upload(dataUri, {
-      folder: 'clicks/promotions',
-      resource_type: 'image',
-      public_id: `promo_${Date.now()}_${req.file.originalname.replace(/[^\\w.-]/g, '_')}`
-    }, (error, result) => {
-      if (error) {
-        console.error('Cloudinary upload error:', error);
-        return res.status(500).json({ error: 'Upload failed: ' + (error.message || error) });
+// Helper: upload a buffer (creates data URI)
+async function uploadBufferToCloudinary(buffer, mimetype = 'image/jpeg', origname = 'file', folder = 'clicks/venues', prefix = ''){
+  const dataUri = `data:${mimetype};base64,${buffer.toString('base64')}`;
+  const public_id = `${prefix || 'img'}_${Date.now()}_${origname.replace(/[^\\w.-]/g, '_')}`;
+  const opts = { folder, resource_type: 'image', public_id };
+  const result = await uploadDataUriToCloudinary(dataUri, opts);
+  return result;
+}
+
+// Helper: upload a local file path (relative to project) to Cloudinary
+async function uploadLocalPathToCloudinary(localRelPath, folder = 'clicks/venues', prefix = ''){
+  try{
+    const abs = path.join(__dirname, localRelPath);
+    if (!fs.existsSync(abs)) throw new Error('Local file not found: ' + abs);
+    const buf = fs.readFileSync(abs);
+    return await uploadBufferToCloudinary(buf, 'image/jpeg', path.basename(abs), folder, prefix);
+  }catch(e){ throw e; }
+}
+
+// Auto-migrate local Media images to Cloudinary for a venue row
+async function ensureVenueImageUrl(row){
+  try{
+    if (!row || !row.image) return row;
+    const img = String(row.image || '');
+    if (/^https?:\/\//i.test(img)) return row; // already a URL
+    // treat as local path if starts with Media/ or file exists
+    const localCandidate = img;
+    const abs = path.join(__dirname, localCandidate);
+    if (fs.existsSync(abs)){
+      const r = await uploadLocalPathToCloudinary(localCandidate, 'clicks/venues', `venue_${row.id}`);
+      if (r && r.secure_url){
+        await runWithRetry(`UPDATE venues SET image = ? WHERE id = ?`, [r.secure_url, row.id]);
+        row.image = r.secure_url;
       }
-      res.json({ path: result.secure_url });
-    });
-  } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed: ' + err.message });
+    }
+    return row;
+  }catch(e){ console.warn('ensureVenueImageUrl failed:', e.message); return row; }
+}
+
+// Auto-migrate local Media images to Cloudinary for a promotion row
+async function ensurePromoImageUrl(p){
+  try{
+    if (!p || !p.image) return p;
+    const img = String(p.image || '');
+    if (/^https?:\/\//i.test(img)) return p;
+    const abs = path.join(__dirname, img);
+    if (fs.existsSync(abs)){
+      const r = await uploadLocalPathToCloudinary(img, 'clicks/promotions', `promo_${p.id}`);
+      if (r && r.secure_url){
+        await runWithRetry(`UPDATE promotions SET image = ? WHERE id = ?`, [r.secure_url, p.id]);
+        p.image = r.secure_url;
+      }
+    }
+    return p;
+  }catch(e){ console.warn('ensurePromoImageUrl failed:', e.message); return p; }
+}
+
+// Unified upload endpoint. Accepts multipart/form-data (field 'file') or JSON payload { image: dataURI | base64, mimetype?, filename? }
+app.post('/upload', upload.single('file'), async (req, res) => {
+  try{
+    const folderHint = (req.query.folder || req.body.folder || req.body.type || 'venues').toString().toLowerCase();
+    const folder = folderHint.includes('promo') || folderHint.includes('promotion') ? 'clicks/promotions' : 'clicks/venues';
+
+    // multipart file took priority
+    if (req.file && req.file.buffer){
+      const result = await uploadBufferToCloudinary(req.file.buffer, req.file.mimetype, req.file.originalname, folder);
+      return res.json({ url: result.secure_url, public_id: result.public_id, raw: result });
+    }
+
+    // JSON body with image
+    const bodyImage = req.body && (req.body.image || req.body.data || req.body.dataURI || req.body.dataUrl);
+    if (bodyImage){
+      let data = String(bodyImage || '');
+      // if plain base64 without data: prefix, build a data URI
+      if (!/^data:/i.test(data)){
+        const mimetype = req.body.mimetype || 'image/jpeg';
+        data = `data:${mimetype};base64,${data}`;
+      }
+      const filename = req.body.filename || req.body.name || `upload_${Date.now()}.jpg`;
+      const result = await uploadDataUriToCloudinary(data, { folder, resource_type: 'image', public_id: `upload_${Date.now()}_${filename.replace(/[^\\w.-]/g, '_')}` });
+      return res.json({ url: result.secure_url, public_id: result.public_id, raw: result });
+    }
+
+    return res.status(400).json({ error: 'No file or image data provided' });
+  }catch(err){
+    console.error('Unified upload failed:', err);
+    return res.status(500).json({ error: err.message || String(err) });
   }
 });
 // =================== STATIC FILES ===================

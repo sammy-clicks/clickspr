@@ -329,13 +329,13 @@ async function saveVenue(v) {
         // optional image upload
         let promoImagePath = '';
         const promoFile = document.getElementById('vPromoImage')?.files?.[0] || null;
-        if (promoFile) {
+            if (promoFile) {
           try {
             const fd = new FormData(); fd.append('promoImage', promoFile);
-            const up = await fetch('/upload/promo', { method: 'POST', body: fd });
+            const up = await fetch('/upload?folder=promotions', { method: 'POST', body: fd });
             const upOut = await (async () => { try { return await up.json(); } catch { return {}; } })();
-            if (up.ok && upOut?.path) {
-              promoImagePath = upOut.path;
+            if (up.ok && (upOut?.url || upOut?.path)) {
+              promoImagePath = upOut.url || upOut.path;
             } else {
               const msg = upOut?.error || upOut?.message || ('Status ' + up.status);
               console.error('Promo upload failed', msg, upOut);
@@ -1525,11 +1525,11 @@ if(vImageFile){
 
     try{
       const fd = new FormData();
-      fd.append('venueImage', file);
-      const res = await fetch('/upload', { method:'POST', body: fd });
+      fd.append('file', file);
+      const res = await fetch('/upload?folder=venues', { method:'POST', body: fd });
       const out = await (async () => { try { return await res.json(); } catch { return {}; } })();
       if(res.ok){
-        const path = out.path || `Media/Venues/${file.name}`;
+        const path = out.url || out.path || `Media/Venues/${file.name}`;
         const input = document.getElementById('vImage');
         if(input) input.value = path;
         return;
