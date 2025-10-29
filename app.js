@@ -593,55 +593,178 @@ const currentWeek = (function(d){
   const storedWeek = localStorage.getItem("clicks_vote_week");
   const hasVoted = storedWeek && parseInt(storedWeek) === currentWeek;
 
- // If already voted, skip full box and show condensed banner by default
+ // If there's a local marker saying the user voted, verify it with server
 if (hasVoted) {
-  // Mark section clean
-  const voteSection = document.getElementById("voteSection");
-  if (voteSection) {
-    voteSection.classList.add("no-bg");
-    voteSection.innerHTML = `
-      <div class="vote-compact-banner">
-        <div class="vote-compact-logo">
-          <img src="Media/logo.png" alt="Clicks Logo">
-        </div>
-        <div class="vote-compact-text">
-          <strong>Thanks for submitting your vote for Clicks Pick of the Week</strong><br>
-          <small>Next vote in <span id="voteCountdownMini"></span>.</small>
-        </div>
-        <button class="show-details-btn small">Show Details</button>
-      </div>
-    `;
+  const voteSectionEl = document.getElementById("voteSection");
+  const storedUserId = localStorage.getItem("USER_KEY");
 
-    // Countdown timer (same as thank-you)
-    function updateCountdownMini() {
-      const now = new Date();
-      const nextMonday = new Date();
-      nextMonday.setDate(now.getDate() + ((8 - now.getDay()) % 7));
-      nextMonday.setHours(0, 0, 0, 0);
-      const diff = nextMonday - now;
-      const el = document.getElementById("voteCountdownMini");
-      if (!el) return;
-      if (diff <= 0) {
-        el.textContent = "you can vote now!";
-        clearInterval(timerMini);
-        return;
+  // If we don't have a user id locally, create one and allow voting again.
+  if (!storedUserId) {
+    try {
+      const newId = crypto.randomUUID();
+      localStorage.setItem("USER_KEY", newId);
+      // Clear the local 'voted' marker so the user can vote with the new id
+      localStorage.removeItem("clicks_vote_week");
+      // Continue to full render (don't show compact banner)
+    } catch (e) {
+      // If crypto is unavailable or storing fails, fall back to compact banner
+      console.warn("Could not create persistent user id:", e);
+      if (voteSectionEl) {
+      voteSectionEl.classList.add("no-bg");
+      voteSectionEl.innerHTML = `
+        <div class="vote-compact-banner">
+          <div class="vote-compact-logo">
+            <img src="Media/logo.png" alt="Clicks Logo">
+          </div>
+          <div class="vote-compact-text">
+            <strong>Thanks for submitting your vote for Clicks Pick of the Week</strong><br>
+            <small>Next vote in <span id="voteCountdownMini"></span>.</small>
+          </div>
+          <button class="show-details-btn small">Show Details</button>
+        </div>
+      `;
+
+      // Countdown timer (same as thank-you)
+      function updateCountdownMini() {
+        const now = new Date();
+        const nextMonday = new Date();
+        nextMonday.setDate(now.getDate() + ((8 - now.getDay()) % 7));
+        nextMonday.setHours(0, 0, 0, 0);
+        const diff = nextMonday - now;
+        const el = document.getElementById("voteCountdownMini");
+        if (!el) return;
+        if (diff <= 0) {
+          el.textContent = "you can vote now!";
+          clearInterval(timerMini);
+          return;
+        }
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+        el.textContent = `${d}d ${h}h ${m}m ${s}s`;
       }
-      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
-      const m = Math.floor((diff / (1000 * 60)) % 60);
-      const s = Math.floor((diff / 1000) % 60);
-      el.textContent = `${d}d ${h}h ${m}m ${s}s`;
-    }
-    updateCountdownMini();
-    const timerMini = setInterval(updateCountdownMini, 1000);
+      updateCountdownMini();
+      const timerMini = setInterval(updateCountdownMini, 1000);
 
-    // Allow restoring full details
-    voteSection.querySelector(".show-details-btn").addEventListener("click", () => {
-      voteSection.innerHTML = "";
-      showThankYouScreen();
-    });
+      // Allow restoring full details
+      voteSectionEl.querySelector(".show-details-btn").addEventListener("click", () => {
+        voteSectionEl.innerHTML = "";
+        showThankYouScreen();
+      });
+    }
+
+      return;
+    }
   }
-  return;
+
+  // Ask server if this user has a recorded vote for the current week. If the
+  // server says they have NOT voted (for example, after an admin reset that
+  // cleared the DB), clear the local marker and continue to render the full
+  // voting UI so the user can vote again.
+  try {
+    const resp = await fetch(`/api/votes/check?userId=${encodeURIComponent(storedUserId)}&week=${currentWeek}`);
+    const obj = await resp.json();
+    if (!obj.voted) {
+      // Server has no record — clear local flag and continue normally
+      localStorage.removeItem("clicks_vote_week");
+    } else {
+      // Server confirms vote still exists; show compact banner
+      const voteSection = document.getElementById("voteSection");
+      if (voteSection) {
+        voteSection.classList.add("no-bg");
+        voteSection.innerHTML = `
+          <div class="vote-compact-banner">
+            <div class="vote-compact-logo">
+              <img src="Media/logo.png" alt="Clicks Logo">
+            </div>
+            <div class="vote-compact-text">
+              <strong>Thanks for submitting your vote for Clicks Pick of the Week</strong><br>
+              <small>Next vote in <span id="voteCountdownMini"></span>.</small>
+            </div>
+            <button class="show-details-btn small">Show Details</button>
+          </div>
+        `;
+
+        // Countdown timer (same as thank-you)
+        function updateCountdownMini() {
+          const now = new Date();
+          const nextMonday = new Date();
+          nextMonday.setDate(now.getDate() + ((8 - now.getDay()) % 7));
+          nextMonday.setHours(0, 0, 0, 0);
+          const diff = nextMonday - now;
+          const el = document.getElementById("voteCountdownMini");
+          if (!el) return;
+          if (diff <= 0) {
+            el.textContent = "you can vote now!";
+            clearInterval(timerMini);
+            return;
+          }
+          const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+          const m = Math.floor((diff / (1000 * 60)) % 60);
+          const s = Math.floor((diff / 1000) % 60);
+          el.textContent = `${d}d ${h}h ${m}m ${s}s`;
+        }
+        updateCountdownMini();
+        const timerMini = setInterval(updateCountdownMini, 1000);
+
+        voteSection.querySelector(".show-details-btn").addEventListener("click", () => {
+          voteSection.innerHTML = "";
+          showThankYouScreen();
+        });
+      }
+      return;
+    }
+  } catch (err) {
+    // If the check fails, play it safe and show the compact banner so the UX
+    // doesn't unexpectedly allow voting while uncertain. We'll still log.
+    console.error("Failed to verify vote state with server:", err);
+    const voteSection = document.getElementById("voteSection");
+    if (voteSection) {
+      voteSection.classList.add("no-bg");
+      voteSection.innerHTML = `
+        <div class="vote-compact-banner">
+          <div class="vote-compact-logo">
+            <img src="Media/logo.png" alt="Clicks Logo">
+          </div>
+          <div class="vote-compact-text">
+            <strong>Thanks for submitting your vote for Clicks Pick of the Week</strong><br>
+            <small>Next vote in <span id="voteCountdownMini"></span>.</small>
+          </div>
+          <button class="show-details-btn small">Show Details</button>
+        </div>
+      `;
+
+      function updateCountdownMini() {
+        const now = new Date();
+        const nextMonday = new Date();
+        nextMonday.setDate(now.getDate() + ((8 - now.getDay()) % 7));
+        nextMonday.setHours(0, 0, 0, 0);
+        const diff = nextMonday - now;
+        const el = document.getElementById("voteCountdownMini");
+        if (!el) return;
+        if (diff <= 0) {
+          el.textContent = "you can vote now!";
+          clearInterval(timerMini);
+          return;
+        }
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+        el.textContent = `${d}d ${h}h ${m}m ${s}s`;
+      }
+      updateCountdownMini();
+      const timerMini = setInterval(updateCountdownMini, 1000);
+
+      voteSection.querySelector(".show-details-btn").addEventListener("click", () => {
+        voteSection.innerHTML = "";
+        showThankYouScreen();
+      });
+    }
+    return;
+  }
 }
 
 

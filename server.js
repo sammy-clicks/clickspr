@@ -422,6 +422,19 @@ app.delete("/api/votes", async (req, res) => {
   }
 });
 
+// Check if a user has voted this week
+app.get('/api/votes/check', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    const week = Number.isFinite(+req.query.week) ? +req.query.week : getISOWeek().week;
+    if (!userId) return res.json({ voted: false });
+    const row = await getWithRetry(`SELECT id FROM votes WHERE userId=? AND week=? LIMIT 1`, [userId, week]);
+    res.json({ voted: !!row });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // =================== SAVE WEEKLY LEADERBOARD SNAPSHOT ===================
 async function saveWeeklyLeaderboardSnapshot() {
   try {
