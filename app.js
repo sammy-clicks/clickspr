@@ -330,8 +330,8 @@ async function saveVenue(v) {
         let promoImagePath = '';
         const promoFile = document.getElementById('vPromoImage')?.files?.[0] || null;
             if (promoFile) {
-          try {
-            const fd = new FormData(); fd.append('promoImage', promoFile);
+            try {
+            const fd = new FormData(); fd.append('file', promoFile);
             const up = await fetch('/upload?folder=promotions', { method: 'POST', body: fd });
             const upOut = await (async () => { try { return await up.json(); } catch { return {}; } })();
             if (up.ok && (upOut?.url || upOut?.path)) {

@@ -1019,14 +1019,17 @@ async function ensurePromoImageUrl(p){
 }
 
 // Unified upload endpoint. Accepts multipart/form-data (field 'file') or JSON payload { image: dataURI | base64, mimetype?, filename? }
-app.post('/upload', upload.single('file'), async (req, res) => {
+// Accept any file field name so clients that still use 'promoImage' or 'venueImage' work.
+app.post('/upload', upload.any(), async (req, res) => {
   try{
     const folderHint = (req.query.folder || req.body.folder || req.body.type || 'venues').toString().toLowerCase();
     const folder = folderHint.includes('promo') || folderHint.includes('promotion') ? 'clicks/promotions' : 'clicks/venues';
 
     // multipart file took priority
-    if (req.file && req.file.buffer){
-      const result = await uploadBufferToCloudinary(req.file.buffer, req.file.mimetype, req.file.originalname, folder);
+    // multer .any() populates req.files as an array
+    const multipartFile = (req.file && req.file.buffer) ? req.file : (Array.isArray(req.files) && req.files[0]) ? req.files[0] : null;
+    if (multipartFile && multipartFile.buffer){
+      const result = await uploadBufferToCloudinary(multipartFile.buffer, multipartFile.mimetype, multipartFile.originalname || multipartFile.filename || 'upload', folder);
       return res.json({ url: result.secure_url, public_id: result.public_id, raw: result });
     }
 
