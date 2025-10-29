@@ -277,6 +277,8 @@ async function ensureClaimColumns(){
 
     await runWithRetry(`CREATE INDEX IF NOT EXISTS ix_promo_claims_user ON promotion_claims(userId)`);
     await runWithRetry(`CREATE INDEX IF NOT EXISTS ix_promo_claims_promo ON promotion_claims(promoId)`);
+    // Ensure extra columns for promotion_claims (migrations)
+    await ensureClaimColumns();
   } catch (err) {
     console.error("❌ DB schema init failed:", err.message);
   }
