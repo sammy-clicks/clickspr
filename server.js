@@ -1151,7 +1151,6 @@ app.delete("/api/promotions/all-reset", async (req, res) => {
 });
 
 // ===== Google Places Importer =====
-require('dotenv').config();
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
 const MEDIA_DIR = path.join(__dirname, "Media", "Venues");
