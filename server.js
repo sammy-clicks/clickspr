@@ -1268,7 +1268,6 @@ app.post("/api/google/import", async (req, res) => {
   }
 });
 
-
 // =================== RESET LEADERBOARD API ===================
 app.delete("/api/leaderboard", async (req, res) => {
   try {
@@ -1280,6 +1279,22 @@ app.delete("/api/leaderboard", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Ensure the `code` column exists in the `promotion_claims` table
+try {
+  const columns = await allWithRetry(`PRAGMA table_info(promotion_claims)`);
+  const hasCodeColumn = columns.some(col => col.name === 'code');
+
+  if (!hasCodeColumn) {
+    console.log("Adding missing 'code' column to 'promotion_claims' table...");
+    await runWithRetry(`ALTER TABLE promotion_claims ADD COLUMN code TEXT`);
+    console.log("✅ 'code' column added successfully.");
+  } else {
+    console.log("✅ 'code' column already exists.");
+  }
+} catch (err) {
+  console.error("❌ Failed to ensure 'code' column exists:", err.message);
+}
 
 // Validate Cloudinary credentials at startup
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
