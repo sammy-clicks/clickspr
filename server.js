@@ -1,6 +1,5 @@
-// server.js — Clicks Beta (SQLite + Promotions fixed to match frontend)
-// --------------------------------------------------
-require('dotenv').config(); // Load environment variables from .env file
+import dotenv from 'dotenv';
+dotenv.config(); // Load environment variables from .env file
 
 const express = require("express");
 const multer  = require("multer");
