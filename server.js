@@ -1102,7 +1102,9 @@ function ensureSchemaAtBoot(next){
 
 // =================== START SERVER ===================
 const PORT = process.env.PORT || 3000;
+console.log('🔧 Starting boot sequence: ensuring schema before listening...');
 ensureSchemaAtBoot(()=>{
+  console.log('🔧 Schema boot callback fired.');
 
 // ✅ Claims Remaining Logic (1 per day)
 app.get("/api/promotions", async (req, res) => {
@@ -1125,8 +1127,8 @@ app.get("/api/promotions", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server listening on port ${PORT} (0.0.0.0)`);
   });
 });
 
