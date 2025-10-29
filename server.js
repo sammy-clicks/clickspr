@@ -71,39 +71,6 @@ const __dirname = path.dirname(__filename);
 const DB_PATH = path.join(__dirname, "venues.db");
 console.log("📁 SQLite file:", DB_PATH);
 const db = new sqlite3.Database(DB_PATH, (err) => {
-
-// ---------- Schema guards & migrations (runs before routes) ----------
-function ensurePromoImageColumn(cb){
-  try{
-    db.all(`PRAGMA table_info(promotions)`, (err, cols)=>{
-      if (err){ console.error('[schema] PRAGMA error:', err.message); return cb && cb(err); }
-      const hasImage = Array.isArray(cols) && cols.some(c => c.name === 'image');
-      if (hasImage) return cb && cb(null);
-      db.run(`ALTER TABLE promotions ADD COLUMN image TEXT`, (e)=>{
-        if (e && !/duplicate|exists/i.test(e.message)) {
-          console.error('[schema] ALTER promotions ADD image failed:', e.message);
-          return cb && cb(e);
-        }
-        console.log('✅ promotions.image column ensured');
-        cb && cb(null);
-      });
-    });
-  }catch(e){
-    console.error('[schema] ensurePromoImageColumn failed:', e);
-    cb && cb(e);
-  }
-}
-
-// Run schema guard at boot before wiring routes
-let __schemaReady = false;
-function ensureSchemaAtBoot(next){
-  ensurePromoImageColumn((err)=>{
-    __schemaReady = !err;
-    if (!err) console.log('✅ Schema ready');
-    else console.warn('⚠️ Schema not fully ready, routes will auto-retry migrate.');
-    next && next();
-  });
-}
   if (err) console.error("❌ DB open error:", err);
 });
 db.serialize();
@@ -1070,38 +1037,6 @@ app.use('/Media', express.static(path.join(__dirname, 'Media')));
 app.use(express.static(__dirname));
 app.get("/health", (req, res) => res.send("✅ Server is running"));
 
-
-// ---------- Schema guards & migrations (top-level) ----------
-function ensurePromoImageColumn(cb){
-  try{
-    db.all(`PRAGMA table_info(promotions)`, (err, cols)=>{
-      if (err){ console.error('[schema] PRAGMA error:', err.message); return cb && cb(err); }
-      const hasImage = Array.isArray(cols) && cols.some(c => c.name === 'image');
-      if (hasImage) return cb && cb(null);
-      db.run(`ALTER TABLE promotions ADD COLUMN image TEXT`, (e)=>{
-        if (e && !/duplicate|exists/i.test(e.message)) {
-          console.error('[schema] ALTER promotions ADD image failed:', e.message);
-          return cb && cb(e);
-        }
-        console.log('✅ promotions.image column ensured');
-        cb && cb(null);
-      });
-    });
-  }catch(e){
-    console.error('[schema] ensurePromoImageColumn failed:', e);
-    cb && cb(e);
-  }
-}
-
-let __schemaReady = false;
-function ensureSchemaAtBoot(next){
-  ensurePromoImageColumn((err)=>{
-    __schemaReady = !err;
-    if (!err) console.log('✅ Schema ready');
-    else console.warn('⚠️ Schema not fully ready, routes will auto-retry migrate.');
-    next && next();
-  });
-}
 
 // =================== START SERVER ===================
 const PORT = process.env.PORT || 3000;
