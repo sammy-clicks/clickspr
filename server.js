@@ -63,6 +63,11 @@ app.use((req, res, next) => {
 });
 
 // =================== DATABASE ===================
+// ES module compatibility: provide __filename and __dirname using fileURLToPath
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const DB_PATH = path.join(__dirname, "venues.db");
 console.log("📁 SQLite file:", DB_PATH);
 const db = new sqlite3.Database(DB_PATH, (err) => {
