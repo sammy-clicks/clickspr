@@ -1105,11 +1105,15 @@ function mapPriceLevelToDollar(price_level) {
 }
 
 function mapTypesToCategory(types = []) {
-  const t = new Set(types);
+  const t = new Set(types || []);
+  // Prefer explicit night_club / bar / liquor_store / pub
   if (t.has("night_club")) return "Club";
   if (t.has("bar")) return "Bar";
-  if (t.has("meal_takeaway") || t.has("restaurant")) return "Lounge";
-  return "Bar";
+  if (t.has("liquor_store")) return "Liquor";
+  if (t.has("pub")) return "Bar";
+  // Restaurants sometimes sell alcohol — caller should also check name keywords
+  if (t.has("restaurant") || t.has("food") || t.has("cafe")) return "Restaurant";
+  return null; // unknown/unsupported
 }
 
 async function downloadImageToMedia(url, filenameBase = "place") {
@@ -1169,9 +1173,24 @@ app.post("/api/google/import", async (req, res) => {
           imagePath = await downloadImageToMedia(photoUrl, (d.name||"place").toLowerCase().replace(/\s+/g,"-"));
         }
 
-        const name = d.name || p.name;
-        const category = categoryHint || mapTypesToCategory(d.types || p.types || []);
+        const name = d.name || p.name || '';
+        // Determine category from types (strict) or fallback to keywords in the name
+        let category = categoryHint || mapTypesToCategory(d.types || p.types || []);
+        // Ensure the place is in Puerto Rico when possible
+        const countryComp = Array.isArray(d.address_components) ? d.address_components.find(c=>Array.isArray(c.types) && c.types.includes('country')) : null;
+        if (countryComp && String(countryComp.short_name || '').toUpperCase() !== 'PR') {
+          console.log('⛔ Skipping place outside PR:', name, countryComp.short_name);
+          continue; // skip results outside Puerto Rico
+        }
         const price = mapPriceLevelToDollar(d.price_level);
+        if (!category) {
+          const n = (name || '').toLowerCase();
+          if (/\b(bar|pub|cocktail|rum|vino|cerveza|brewery|taproom|distill|cantina|tasca|wine|liquor)\b/.test(n)) category = 'Bar';
+        }
+        if (!category) {
+          console.log('⛔ Skipping non-alcohol place (no matching types/keywords):', name);
+          continue;
+        }
         const expect = d.formatted_address || "Imported via Google Places";
         const isPick = 0;
         const coord = d.geometry?.location || p.geometry?.location || {};
