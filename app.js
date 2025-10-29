@@ -887,11 +887,11 @@ async function renderPromotions(){
         </div>
       `).join('');
 
-    // Ensure 5-col centered grid
-    list.style.display = 'grid';
-    list.style.gridTemplateColumns = 'repeat(5, minmax(200px, 1fr))';
-    list.style.justifyContent = 'center';
-    list.style.gap = '20px';
+  // Responsive grid for promo cards — let it wrap on small screens
+  list.style.display = 'grid';
+  list.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+  list.style.justifyContent = 'center';
+  list.style.gap = '20px';
 
     list.querySelectorAll('.promo-card').forEach(card => {
       card.addEventListener('click', async (e) => {
