@@ -1,14 +1,17 @@
 import dotenv from 'dotenv';
 dotenv.config(); // Load environment variables from .env file
 
-const express = require("express");
-const multer  = require("multer");
-const path    = require("path");
-const fs      = require("fs");
-const sqlite3 = require("sqlite3").verbose();
-const QRCode  = require("qrcode");
-const { webcrypto } = require("crypto");
-const cloudinary = require("cloudinary").v2;
+import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import sqlite3 from "sqlite3";
+import QRCode from "qrcode";
+import { webcrypto } from "crypto";
+import cloudinary from "cloudinary";
+
+sqlite3.verbose();
+const cloudinaryV2 = cloudinary.v2;
 
 const app = express();
 app.use(express.json());
@@ -23,7 +26,7 @@ app.use((req, res, next) => {
 });
 
 // Configure Cloudinary
-cloudinary.config({
+cloudinaryV2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'drppscucj',
   api_key: process.env.CLOUDINARY_API_KEY || 'your_api_key_here',
   api_secret: process.env.CLOUDINARY_API_SECRET || 'your_api_secret_here'
@@ -953,7 +956,7 @@ const upload = multer({
 // Helper: upload a data URI to Cloudinary returning a Promise
 function uploadDataUriToCloudinary(dataUri, opts = {}){
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload(dataUri, opts, (err, result) => {
+    cloudinaryV2.uploader.upload(dataUri, opts, (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
