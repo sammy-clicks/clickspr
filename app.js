@@ -360,6 +360,7 @@ async function saveVenue(v) {
         try { promoOut = JSON.parse(promoText); } catch { promoOut = { raw: promoText }; }
         if (!promoRes.ok) {
           console.warn('⚠️ Promotion not created:', promoOut?.error || promoRes.status, promoOut?.raw || '');
+          try { alert('Promotion not created: ' + (promoOut?.error || promoRes.status)); } catch(e){}
         } else {
           // update cache
           try { activePromosByVenue.set(String(v.id || data?.id), promoOut); } catch(_){}

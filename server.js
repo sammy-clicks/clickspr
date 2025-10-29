@@ -608,6 +608,7 @@ app.get("/api/promotions", async (req, res) => {
 // Body: { venueId, title, description, image }
 app.post("/api/promotions", async (req, res) => {
   const { venueId, title, description, image } = req.body || {};
+  console.log('➡️ POST /api/promotions', { venueId, title, hasImage: !!image });
   if (!venueId || !title) return res.status(400).json({ error: "venueId and title required" });
 
   const doInsert = async () => {
@@ -634,6 +635,7 @@ app.post("/api/promotions", async (req, res) => {
         WHERE p.id = ?
       `, [lastID]);
 
+      console.log('✅ Promotion created', { promoId: lastID, venueId });
       return res.json(row);
     } catch (err) {
       const msg = (err && err.message) || String(err);
@@ -641,22 +643,18 @@ app.post("/api/promotions", async (req, res) => {
         return res.status(409).json({ error: "Retry: short code collision" });
       }
       if (/no such column: image/i.test(msg)) {
-        // Auto-migrate then retry once
-        return ensurePromoImageColumn((e2)=>{
-          if (e2) return res.status(500).json({ error: e2.message || 'migration failed' });
-          doInsert().catch(e3 => res.status(500).json({ error: (e3 && e3.message) || String(e3) }));
-        });
+        // Auto-migrate the promotions.image column then retry once
+        try {
+          await runWithRetry(`ALTER TABLE promotions ADD COLUMN image TEXT`);
+          return doInsert();
+        } catch (migrateErr) {
+          return res.status(500).json({ error: migrateErr.message || String(migrateErr) });
+        }
       }
       return res.status(500).json({ error: msg });
     }
   };
-
-  if (!__schemaReady) {
-    return ensurePromoImageColumn((e)=>{
-      if (e) return res.status(500).json({ error: e.message || 'migration failed' });
-      doInsert().catch(err => res.status(500).json({ error: (err && err.message) || String(err) }));
-    });
-  }
+  // Execute the insert now that schema is initialized at server start
   return doInsert();
 });
 
@@ -1044,32 +1042,10 @@ const PORT = process.env.PORT || 3000;
 (async function startServer() {
   try {
     console.log('🔧 Starting boot sequence...');
-    
+
     // Wait for schema to initialize
     await initSchema();
-    
-    console.log('🔧 Registering routes...');
-    
-    // ✅ Claims Remaining Logic (1 per day)
-    app.get("/api/promotions", async (req, res) => {
-      try {
-        const promos = await allWithRetry("SELECT * FROM promotions WHERE active=1");
-        const userId = req.query.userId || "anon";
-        const todayStart = Math.floor(Date.now() / 1000) - (Date.now() % 86400);
-
-        for (const p of promos) {
-          const claim = await getWithRetry(
-            `SELECT id FROM promotion_claims WHERE promoId=? AND userId=? AND claimed_at > ?`,
-            [p.id, userId, todayStart]
-          );
-          p.claimsRemaining = claim ? 0 : 1;
-        }
-
-        res.json(promos);
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
-    });
+    console.log('🔧 Schema initialized — starting server');
 
     // Start listening
     app.listen(PORT, "0.0.0.0", () => {
