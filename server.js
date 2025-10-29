@@ -188,8 +188,9 @@ async function ensureClaimColumns(){
 }
 
 // =================== SCHEMA ===================
-(async () => {
+async function initSchema() {
   try {
+    console.log('🔧 Initializing database schema...');
     await runWithRetry(`CREATE TABLE IF NOT EXISTS venues (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT,
@@ -279,10 +280,12 @@ async function ensureClaimColumns(){
     await runWithRetry(`CREATE INDEX IF NOT EXISTS ix_promo_claims_promo ON promotion_claims(promoId)`);
     // Ensure extra columns for promotion_claims (migrations)
     await ensureClaimColumns();
+    console.log('✅ Database schema initialized successfully');
   } catch (err) {
     console.error("❌ DB schema init failed:", err.message);
+    throw err;
   }
-})();
+}
 
 // =================== VENUES API ===================
 
@@ -1102,35 +1105,46 @@ function ensureSchemaAtBoot(next){
 
 // =================== START SERVER ===================
 const PORT = process.env.PORT || 3000;
-console.log('🔧 Starting boot sequence: ensuring schema before listening...');
-ensureSchemaAtBoot(()=>{
-  console.log('🔧 Schema boot callback fired.');
 
-// ✅ Claims Remaining Logic (1 per day)
-app.get("/api/promotions", async (req, res) => {
+(async function startServer() {
   try {
-    const promos = await allWithRetry("SELECT * FROM promotions WHERE active=1");
-    const userId = req.query.userId || "anon";
-    const todayStart = Math.floor(Date.now() / 1000) - (Date.now() % 86400);
+    console.log('🔧 Starting boot sequence...');
+    
+    // Wait for schema to initialize
+    await initSchema();
+    
+    console.log('🔧 Registering routes...');
+    
+    // ✅ Claims Remaining Logic (1 per day)
+    app.get("/api/promotions", async (req, res) => {
+      try {
+        const promos = await allWithRetry("SELECT * FROM promotions WHERE active=1");
+        const userId = req.query.userId || "anon";
+        const todayStart = Math.floor(Date.now() / 1000) - (Date.now() % 86400);
 
-    for (const p of promos) {
-      const claim = await getWithRetry(
-        `SELECT id FROM promotion_claims WHERE promoId=? AND userId=? AND claimed_at > ?`,
-        [p.id, userId, todayStart]
-      );
-      p.claimsRemaining = claim ? 0 : 1;
-    }
+        for (const p of promos) {
+          const claim = await getWithRetry(
+            `SELECT id FROM promotion_claims WHERE promoId=? AND userId=? AND claimed_at > ?`,
+            [p.id, userId, todayStart]
+          );
+          p.claimsRemaining = claim ? 0 : 1;
+        }
 
-    res.json(promos);
+        res.json(promos);
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // Start listening
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server listening on port ${PORT} (0.0.0.0)`);
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
   }
-});
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server listening on port ${PORT} (0.0.0.0)`);
-  });
-});
+})();
 
 
 // Graceful shutdown
