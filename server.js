@@ -1280,3 +1280,21 @@ app.delete("/api/leaderboard", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Validate Cloudinary credentials at startup
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.error("❌ Missing Cloudinary credentials. Ensure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are set.");
+} else if (process.env.CLOUDINARY_API_KEY === 'your_api_key_here') {
+  console.error("❌ Placeholder Cloudinary API key detected. Replace 'your_api_key_here' with your actual API key.");
+} else {
+  console.log("✅ Cloudinary credentials loaded successfully.");
+}
+
+// Validate Google Maps API key
+if (!process.env.GOOGLE_MAPS_API_KEY) {
+  console.error("❌ Missing Google Maps API key. Ensure GOOGLE_MAPS_API_KEY is set.");
+} else if (process.env.GOOGLE_MAPS_API_KEY === 'your_google_maps_api_key_here') {
+  console.error("❌ Placeholder Google Maps API key detected. Replace 'your_google_maps_api_key_here' with your actual API key.");
+} else {
+  console.log("✅ Google Maps API key loaded successfully.");
+}
