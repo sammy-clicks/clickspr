@@ -692,11 +692,11 @@ list.forEach(v => {
     // Voting behavior
     carousel.querySelectorAll(".btn-vote").forEach(btn => {
       btn.addEventListener("click", async e => {
-        if (localStorage.getItem("clicks_vote_week") == currentWeek) {
-          alert("You've already voted this week! Come back next Monday.");
-          return;
-        }
-
+        // Always attempt to submit the vote to the server. Relying solely on
+        // localStorage to gate voting causes desync when an admin resets votes
+        // server-side (the DB may be cleared but clients still think they've
+        // voted). The server enforces uniqueness and will return 409 if the
+        // user already voted this week.
         const venueId = e.target.dataset.id;
         const userId = localStorage.getItem("USER_KEY") || crypto.randomUUID();
 
@@ -706,15 +706,27 @@ list.forEach(v => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ venueId, userId, week: currentWeek })
           });
-          const data = await res.json();
 
-          if (!res.ok) throw new Error(data.error || "Vote failed");
+          if (res.ok) {
+            // Save local record and show thank-you
+            localStorage.setItem("clicks_vote_week", currentWeek.toString());
+            showThankYouScreen();
+            return;
+          }
 
-          // Save local record
-          localStorage.setItem("clicks_vote_week", currentWeek.toString());
+          // Handle known server responses
+          const data = await res.json().catch(()=>({ error: 'Unknown' }));
+          if (res.status === 409) {
+            // Server says user already voted; mirror that locally to avoid
+            // repeated attempts and inform the user.
+            localStorage.setItem("clicks_vote_week", currentWeek.toString());
+            alert("You've already voted this week! Come back next Monday.");
+            return;
+          }
 
-          // Replace with thank-you
-          showThankYouScreen();
+          // Other errors
+          console.error("❌ Vote error:", data.error || data);
+          alert("There was a problem submitting your vote: " + (data.error || res.status));
         } catch (err) {
           console.error("❌ Vote error:", err);
           alert("There was a problem submitting your vote.");
