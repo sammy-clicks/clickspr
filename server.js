@@ -80,14 +80,43 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_PATH = path.join(__dirname, "venues.db");
+// Allow overriding the DB path via environment (useful for persistent mounts)
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, "venues.db");
 console.log("📁 SQLite file:", DB_PATH);
+
+// Ensure parent directory exists (important when using mounted persistent volumes)
+const dbDir = path.dirname(DB_PATH);
+try {
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+} catch (err) {
+  console.warn("⚠️ Could not ensure DB directory exists:", err && err.message);
+}
+
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) console.error("❌ DB open error:", err);
 });
 db.serialize();
 db.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000;", (err) => {
   if (err) console.warn("⚠️  PRAGMA set failed:", err.message);
+});
+
+// --- Admin utility: export the DB file (useful to pull an existing DB before redeploy)
+// Provide ADMIN_DB_EXPORT_KEY env var and call GET /admin/export-db?key=THEKEY to download
+// Warning: keep the key secret. This endpoint streams the raw SQLite file.
+app.get('/admin/export-db', (req, res) => {
+  const keyFromReq = req.query.key || req.headers['x-admin-key'];
+  const secret = process.env.ADMIN_DB_EXPORT_KEY;
+  if (!secret) return res.status(403).send('DB export disabled');
+  if (!keyFromReq || keyFromReq !== secret) return res.status(401).send('unauthorized');
+  if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
+  res.setHeader('Content-Disposition', 'attachment; filename="venues.db"');
+  res.setHeader('Content-Type', 'application/octet-stream');
+  const rs = fs.createReadStream(DB_PATH);
+  rs.on('error', (err) => {
+    console.error('Error streaming DB file:', err && err.message);
+    res.status(500).end();
+  });
+  rs.pipe(res);
 });
 
 // Helpers for busy retry
