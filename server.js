@@ -20,6 +20,7 @@ import fs from "fs";
 import sqlite3 from "sqlite3";
 import QRCode from "qrcode";
 import { webcrypto } from "crypto";
+import os from 'os';
 import cloudinary from "cloudinary";
 
 sqlite3.verbose();
@@ -117,6 +118,40 @@ app.get('/admin/export-db', (req, res) => {
     res.status(500).end();
   });
   rs.pipe(res);
+});
+
+// --- Admin utility: import a DB file (protected)
+// POST /admin/import-db (multipart form field 'file') with ADMIN_DB_EXPORT_KEY
+const fileUpload = multer({ dest: path.join(os.tmpdir(), 'clicks-uploads') });
+app.post('/admin/import-db', fileUpload.single('file'), async (req, res) => {
+  try {
+    const keyFromReq = req.query.key || req.headers['x-admin-key'];
+    const secret = process.env.ADMIN_DB_EXPORT_KEY;
+    if (!secret) return res.status(403).send('DB import disabled');
+    if (!keyFromReq || keyFromReq !== secret) return res.status(401).send('unauthorized');
+  if (!req.file) return res.status(400).send('no file uploaded');
+
+  const uploadedPath = req.file.path;
+    const destPath = DB_PATH;
+
+    // Write to a temporary path first then move into place
+    const tmpDest = destPath + '.tmp';
+    // Copy uploaded file to tmpDest
+    await fs.promises.copyFile(uploadedPath, tmpDest);
+    // Move tmpDest into final location (atomic on most systems)
+    await fs.promises.rename(tmpDest, destPath);
+
+    // Clean up uploaded file
+    try { await fs.promises.unlink(uploadedPath); } catch (e) {}
+
+    // Note: the running process has the DB file open; to be safe, restart the
+    // service after importing so SQLite reopens the new file. We'll return a
+    // hint to the operator to redeploy/restart.
+    return res.json({ ok: true, message: 'imported; please restart the service to ensure DB is reopened' });
+  } catch (err) {
+    console.error('❌ Import DB error:', err && (err.stack || err.message || String(err)));
+    return res.status(500).json({ error: err && err.message });
+  }
 });
 
 // Helpers for busy retry
