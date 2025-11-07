@@ -55,8 +55,15 @@ Response: { "url": "https://res.cloudinary.com/.../image.jpg", "public_id": "...
 https://clickspr.onrender.com/admin/export-db?key=clicks-db-export
 
 Export:
-curl "https://clickspr.onrender.com/admin/export-db?key=clicks-db-export" -o "venues.db"
+# Save: download DB from protected endpoint
+New-Item -ItemType Directory -Path .\backups -Force | Out-Null
+$ts = (Get-Date).ToString('yyyyMMdd-HHmmss')
+$adminKey = 'clicks-db-export'
+$uri = "https://clickspr.onrender.com/admin/export-db?key=$adminKey"
+$out = ".\backups\venues-$ts.db"
 
+Invoke-WebRequest -Uri $uri -OutFile $out -Verbose
+If (Test-Path $out) { Write-Host "Saved $out" } else { Write-Host "Download failed (401 or other error)" }
 
 Restore:
 curl -X POST "https://clickspr.onrender.com/admin/import-db?key=clicks-db-export" -F "file=@venues.db"
