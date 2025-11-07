@@ -23,7 +23,8 @@
 
     <div id="tools" class="hidden">
       <h2>Backups</h2>
-      <button id="save-db">Save Database (create timestamped backup)</button>
+  <button id="save-db">Save Database (create timestamped backup)</button>
+  <button id="download-db">Download DB to this computer</button>
       <h2>Restore</h2>
       <p>Choose a .db file to restore (the server will restart automatically).</p>
       <input id="restore-file" type="file" accept="*" />
@@ -85,6 +86,19 @@
       if(r.ok){ setStatus(json.message || 'Restore succeeded — server will restart'); }
       else { setStatus('Restore failed: ' + (json.error || JSON.stringify(json)), true); }
     }catch(e){ setStatus('Restore failed: ' + e.message, true); }
+  });
+
+  document.getElementById('download-db').addEventListener('click', async ()=>{
+    const key = sessionStorage.getItem('clicks_admin_key');
+    if(!key){ setStatus('Unlock first with the admin key', true); return; }
+    setStatus('Preparing download...');
+    try{
+      // Trigger browser download by navigating to the endpoint that streams the DB
+      const url = '/admin/export-db?key=' + encodeURIComponent(key) + '&download=1';
+      // open in same tab to trigger download prompt
+      window.location = url;
+      setStatus('Download started');
+    }catch(e){ setStatus('Download failed: ' + e.message, true); }
   });
 </script>
 </body>

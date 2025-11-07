@@ -120,6 +120,15 @@ app.get('/admin/export-db', (req, res) => {
     return res.status(200).end();
   }
 
+  // If client asked for a direct download (useful when running remotely),
+  // stream the DB file as an attachment so the admin can save it locally.
+  if (req.query.download === '1' || req.query.download === 'true') {
+    if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
+    return res.download(DB_PATH, 'venues.db', (err) => {
+      if (err) console.error('Error streaming DB file:', err && err.message);
+    });
+  }
+
   const BACKUP_DIR = path.join(__dirname, 'backups');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
   const BACKUP_PATH = path.join(BACKUP_DIR, `venues-backup-${timestamp}.db`);
