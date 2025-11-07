@@ -51,3 +51,13 @@ JSON (base64 data):
 	{ "image": "data:image/png;base64,iVBORw0KG...", "filename": "logo.png", "folder": "promotions" }
 
 Response: { "url": "https://res.cloudinary.com/.../image.jpg", "public_id": "..." }
+
+https://clickspr.onrender.com/admin/export-db?key=clicks-db-export
+
+Export:
+curl "https://clickspr.onrender.com/admin/export-db?key=clicks-db-export" -o "venues.db"
+
+
+Restore:
+curl -X POST "https://clickspr.onrender.com/admin/import-db?key=clicks-db-export" -F "file=@venues.db"
+
