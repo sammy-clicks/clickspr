@@ -81,9 +81,14 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Allow overriding the DB path via environment (useful for persistent mounts)
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "venues.db");
-console.log("📁 SQLite file:", DB_PATH);
+// Allow overriding the DB path via environment (useful for persistent mounts).
+// By default, prefer a user-specific persistent location (in the user's
+// home directory) instead of creating the DB inside the project folder
+// which can be removed on redeploy. Operators should still set DB_PATH to a
+// mounted persistent volume in production (e.g. Docker volume, host path).
+const DEFAULT_DATA_DIR = process.env.CLICKS_DATA_DIR || path.join(os.homedir() || __dirname, '.clicks');
+const DB_PATH = process.env.DB_PATH || path.join(DEFAULT_DATA_DIR, 'venues.db');
+console.log("📁 SQLite file:", DB_PATH, "(data dir:", DEFAULT_DATA_DIR, ")");
 
 // Ensure parent directory exists (important when using mounted persistent volumes)
 const dbDir = path.dirname(DB_PATH);
@@ -109,15 +114,27 @@ app.get('/admin/export-db', (req, res) => {
   const secret = process.env.ADMIN_DB_EXPORT_KEY;
   if (!secret) return res.status(403).send('DB export disabled');
   if (!keyFromReq || keyFromReq !== secret) return res.status(401).send('unauthorized');
-  if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
-  res.setHeader('Content-Disposition', 'attachment; filename="venues.db"');
-  res.setHeader('Content-Type', 'application/octet-stream');
-  const rs = fs.createReadStream(DB_PATH);
-  rs.on('error', (err) => {
-    console.error('Error streaming DB file:', err && err.message);
-    res.status(500).end();
-  });
-  rs.pipe(res);
+
+  // If this is a HEAD request (for admin verification), just return 200
+  if (req.method === 'HEAD') {
+    return res.status(200).end();
+  }
+
+  const BACKUP_DIR = path.join(__dirname, 'backups');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const BACKUP_PATH = path.join(BACKUP_DIR, `venues-backup-${timestamp}.db`);
+
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    }
+    fs.copyFileSync(DB_PATH, BACKUP_PATH);
+    console.log(`✅ Database saved to ${BACKUP_PATH}`);
+    res.status(200).json({ ok: true, message: `Database saved to ${BACKUP_PATH}`, path: BACKUP_PATH });
+  } catch (err) {
+    console.error('❌ Error saving database:', err.message);
+    res.status(500).json({ error: 'Failed to save database: ' + err.message });
+  }
 });
 
 // --- Admin utility: import a DB file (protected)
@@ -129,30 +146,65 @@ app.post('/admin/import-db', fileUpload.single('file'), async (req, res) => {
     const secret = process.env.ADMIN_DB_EXPORT_KEY;
     if (!secret) return res.status(403).send('DB import disabled');
     if (!keyFromReq || keyFromReq !== secret) return res.status(401).send('unauthorized');
-  if (!req.file) return res.status(400).send('no file uploaded');
+    if (!req.file) return res.status(400).send('no file uploaded');
 
-  const uploadedPath = req.file.path;
+    const uploadedPath = req.file.path;
     const destPath = DB_PATH;
 
-    // Write to a temporary path first then move into place
-    const tmpDest = destPath + '.tmp';
-    // Copy uploaded file to tmpDest
-    await fs.promises.copyFile(uploadedPath, tmpDest);
-    // Move tmpDest into final location (atomic on most systems)
-    await fs.promises.rename(tmpDest, destPath);
+    // Close the database connection before replacing the file
+    await new Promise((resolve) => {
+      db.close(() => {
+        console.log('🔒 Database connection closed for import');
+        resolve();
+      });
+    });
 
+    // Copy uploaded file directly to destination (overwrite)
+    await fs.promises.copyFile(uploadedPath, destPath);
+    
     // Clean up uploaded file
     try { await fs.promises.unlink(uploadedPath); } catch (e) {}
 
-    // Note: the running process has the DB file open; to be safe, restart the
-    // service after importing so SQLite reopens the new file. We'll return a
-    // hint to the operator to redeploy/restart.
-    return res.json({ ok: true, message: 'imported; please restart the service to ensure DB is reopened' });
+    console.log('✅ Database restored successfully. Server will restart...');
+    
+    // Send response before restarting
+    res.json({ ok: true, message: 'Database restored successfully. Server restarting...' });
+    
+    // Restart the process after a short delay
+    setTimeout(() => {
+      console.log('🔄 Restarting server...');
+      process.exit(0);
+    }, 500);
+    
   } catch (err) {
     console.error('❌ Import DB error:', err && (err.stack || err.message || String(err)));
     return res.status(500).json({ error: err && err.message });
   }
 });
+
+  // Serve a simple admin UI page (admin.html) if present at the project root.
+  app.get('/admin', (req, res) => {
+    try {
+      const adminPath = path.join(__dirname, 'admin.html');
+      if (fs.existsSync(adminPath)) return res.sendFile(adminPath);
+      return res.status(404).send('admin page not found');
+    } catch (e) {
+      console.error('Error serving admin page:', e && e.message);
+      return res.status(500).send('server error');
+    }
+  });
+
+  // Also serve admin.html at /admin.html for direct access
+  app.get('/admin.html', (req, res) => {
+    try {
+      const adminPath = path.join(__dirname, 'admin.html');
+      if (fs.existsSync(adminPath)) return res.sendFile(adminPath);
+      return res.status(404).send('admin page not found');
+    } catch (e) {
+      console.error('Error serving admin page:', e && e.message);
+      return res.status(500).send('server error');
+    }
+  });
 
 // Helpers for busy retry
 function runWithRetry(sql, params = [], label = "run", maxRetries = 5, delay = 50) {

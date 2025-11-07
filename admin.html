@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — Database Tools</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
+    .card{max-width:720px;margin:0 auto;padding:18px;border:1px solid #ddd;border-radius:8px}
+    label,input,button{display:block;margin:8px 0}
+    #tools{margin-top:12px}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin Database Tools</h1>
+    <p>This page is for admins only. Enter the admin key to unlock the backup/restore tools.</p>
+
+    <label for="admin-key">Admin Key</label>
+    <input id="admin-key" type="password" autocomplete="off" placeholder="Enter admin key" />
+    <button id="unlock">Unlock</button>
+
+    <div id="tools" class="hidden">
+      <h2>Backups</h2>
+      <button id="save-db">Save Database (create timestamped backup)</button>
+      <h2>Restore</h2>
+      <p>Choose a .db file to restore (the server will restart automatically).</p>
+      <input id="restore-file" type="file" accept="*" />
+      <button id="restore-btn">Restore Database</button>
+
+      <div id="status" style="margin-top:12px;color:green"></div>
+    </div>
+  </div>
+
+<script>
+  const unlockBtn = document.getElementById('unlock');
+  const adminKeyEl = document.getElementById('admin-key');
+  const tools = document.getElementById('tools');
+  const status = document.getElementById('status');
+
+  function setStatus(msg, isError){ status.style.color = isError ? 'red' : 'green'; status.textContent = msg; }
+
+  unlockBtn.addEventListener('click', async ()=>{
+    const key = adminKeyEl.value && adminKeyEl.value.trim();
+    if(!key){ setStatus('Enter an admin key', true); return; }
+    try{
+      // Verify key using HEAD so it doesn't trigger a backup
+      const r = await fetch('/admin/export-db?key=' + encodeURIComponent(key), { method: 'HEAD' });
+      if(r.ok){
+        sessionStorage.setItem('clicks_admin_key', key);
+        tools.classList.remove('hidden');
+        setStatus('Unlocked — you may now save or restore the database');
+      } else {
+        setStatus('Invalid admin key', true);
+      }
+    }catch(e){ setStatus('Verification failed: ' + (e.message || e), true); }
+  });
+
+  document.getElementById('save-db').addEventListener('click', async ()=>{
+    const key = sessionStorage.getItem('clicks_admin_key');
+    if(!key){ setStatus('Unlock first with the admin key', true); return; }
+    setStatus('Saving backup...');
+    try{
+      const r = await fetch('/admin/export-db?key=' + encodeURIComponent(key));
+      const json = await r.json();
+      if(r.ok){ setStatus('Saved: ' + (json.path || json.message)); }
+      else { setStatus('Save failed: ' + (json.error || JSON.stringify(json)), true); }
+    }catch(e){ setStatus('Save failed: ' + e.message, true); }
+  });
+
+  document.getElementById('restore-btn').addEventListener('click', async ()=>{
+    const key = sessionStorage.getItem('clicks_admin_key');
+    if(!key){ setStatus('Unlock first with the admin key', true); return; }
+    const fileInput = document.getElementById('restore-file');
+    const file = fileInput.files && fileInput.files[0];
+    if(!file){ setStatus('Select a file to upload', true); return; }
+    if(!confirm('This will replace the current database and restart the server. Continue?')) return;
+
+    setStatus('Uploading and restoring...');
+    const fd = new FormData(); fd.append('file', file);
+    try{
+      const r = await fetch('/admin/import-db?key=' + encodeURIComponent(key), { method: 'POST', body: fd });
+      const json = await r.json();
+      if(r.ok){ setStatus(json.message || 'Restore succeeded — server will restart'); }
+      else { setStatus('Restore failed: ' + (json.error || JSON.stringify(json)), true); }
+    }catch(e){ setStatus('Restore failed: ' + e.message, true); }
+  });
+</script>
+</body>
+</html>
