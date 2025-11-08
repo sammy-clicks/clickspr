@@ -103,7 +103,7 @@ try {
   console.warn("⚠️ Could not ensure DB directory exists:", err && err.message);
 }
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
+let db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) console.error("❌ DB open error:", err);
 });
 db.serialize();
@@ -238,55 +238,64 @@ app.post('/admin/import-db', fileUpload.single('file'), async (req, res) => {
     const uploadedPath = req.file.path;
     const destPath = DB_PATH;
 
-    console.log('🔄 Closing database connection for restore...');
-    
-    // Close the database connection and wait for it
+    console.log('🔄 Importing database in-process (no restart)...');
+
+    // Close the current database connection cleanly
     await new Promise((resolve, reject) => {
-      db.close((err) => {
-        if (err) {
-          console.error('Error closing DB:', err.message);
-          reject(err);
-        } else {
+      try {
+        db.close((err) => {
+          if (err) {
+            console.error('Error closing DB before import:', err.message);
+            return reject(err);
+          }
           console.log('✅ Database connection closed');
           resolve();
-        }
-      });
+        });
+      } catch (closeErr) {
+        // If close throws synchronously, log and continue with replacement attempt
+        console.warn('⚠️ Exception while closing DB (continuing):', closeErr && closeErr.message);
+        resolve();
+      }
     });
 
-    // Wait a moment for file handles to be fully released
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Small pause to allow OS to release file handles
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     console.log('📁 Replacing database file...');
-    
-    // Copy uploaded file directly to destination (overwrite)
     await fs.promises.copyFile(uploadedPath, destPath);
-    
-    console.log('✅ Database file replaced');
-    
-    // Clean up uploaded file
     try { await fs.promises.unlink(uploadedPath); } catch (e) {}
+    console.log('✅ Database file replaced on disk');
 
-    console.log('🔄 Restarting server to reopen database...');
-    
-    // Send response before restarting
-    res.json({ ok: true, message: 'Database restored successfully. Server will restart in 1 second...' });
-    
-    // Restart the process after sending response
-    setTimeout(() => {
-      console.log('� Exiting to trigger restart (use PM2 or nodemon for auto-restart)');
-      process.exit(0);
-    }, 1000);
-    
+    // Reopen database connection into the existing variable
+    db = new sqlite3.Database(DB_PATH, (err) => {
+      if (err) {
+        console.error('❌ DB reopen error after import:', err && (err.stack || err.message));
+      } else {
+        console.log('✅ Database reopened after import');
+        // reapply runtime PRAGMAs
+        try {
+          db.serialize();
+          db.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000;", (pErr) => {
+            if (pErr) console.warn('⚠️  PRAGMA set after reopen failed:', pErr && pErr.message);
+          });
+        } catch (execErr) {
+          console.warn('⚠️ Could not set PRAGMA after reopen:', execErr && execErr.message);
+        }
+      }
+    });
+
+    // Respond success — no restart required
+    return res.json({ ok: true, message: 'Database restored and reopened in-process' });
+
   } catch (err) {
     console.error('❌ Import DB error:', err && (err.stack || err.message || String(err)));
-    // Try to reopen the database if import failed
+    // Try to reopen the database connection to a sane state
     try {
-      const sqlite3 = await import('sqlite3');
-      const newDb = new sqlite3.default.Database(DB_PATH);
-      Object.assign(db, newDb);
-      console.log('⚠️ Database connection reopened after failed import');
+      const newDb = new sqlite3.Database(DB_PATH);
+      db = newDb;
+      console.log('⚠️ Database connection reopened after failed import attempt');
     } catch (reopenErr) {
-      console.error('❌ Could not reopen database:', reopenErr.message);
+      console.error('❌ Could not reopen database after failed import:', reopenErr && reopenErr.message);
     }
     return res.status(500).json({ error: err && err.message });
   }

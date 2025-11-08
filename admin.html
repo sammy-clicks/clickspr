@@ -84,20 +84,12 @@
       const r = await fetch('/admin/import-db?key=' + encodeURIComponent(key), { method: 'POST', body: fd });
       const json = await r.json();
       if(r.ok){ 
-        setStatus(json.message || 'Restore succeeded — server will restart');
-        // Wait for server to restart then reload
-        setTimeout(() => {
-          setStatus('Reloading page...');
-          window.location.reload();
-        }, 2000);
+        // The server now replaces and reopens the DB in-process without restart.
+        setStatus(json.message || 'Restore succeeded — database file replaced and reopened in-process');
       }
       else { setStatus('Restore failed: ' + (json.error || JSON.stringify(json)), true); }
     }catch(e){ 
-      setStatus('Restore in progress or server restarting...', false);
-      // Server might have restarted, try reloading after delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 3000);
+      setStatus('Restore failed (network or server error): ' + (e && (e.message||e)), true);
     }
   });
 
