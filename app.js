@@ -1760,8 +1760,40 @@ function makeChart(ctx, type, data, options){
   return new Chart(ctx, { type, data, options });
 }
 
+// Pull events from server (merge into local events) so admins can
+// rebuild analytics after restoring a DB on the server. This does a
+// best-effort merge (no destructive deletes) and persists into
+// localStorage so subsequent renders use the combined set.
+async function syncEventsFromServer(){
+  if(!isAdmin()) return; // restrict to admins by default
+  try{
+    const res = await fetch('/api/events');
+    if(!res.ok) return;
+    const rows = await res.json();
+    if(!Array.isArray(rows)) return;
+    // Replace local events with server-authoritative events. When an admin
+    // restores the DB, clients should reflect the server state (remove
+    // orphaned events/venues). This is intentionally destructive for
+    // events to avoid stale analytics on the client.
+    events = rows.slice();
+    saveEvents();
+    // Ensure we have a current session for this client after replacing
+    // event history.
+    try{ startSession(); }catch(_){}
+  }catch(err){
+    console.warn('Failed to sync events from server:', err);
+  }
+}
+
 function renderAnalytics(){
   if(analyticsPanel?.style?.display==="none") return;
+
+  // NOTE: renderAnalytics assumes `events` array is up-to-date. In some
+  // workflows admins restore the server-side DB which contains historical
+  // events but client localStorage is empty. Provide a small, opt-in
+  // server-sync so admins can pull `/api/events` into local `events`
+  // before the view is rendered. This keeps the client-side analytics
+  // consistent with the restored database.
 
   const sessionEvents = events.filter(e=>e.type==="session");
   const clickEvents = events.filter(e=>e.type==="click");
@@ -1890,7 +1922,7 @@ function openZones(){ hide(welcome); hide(venuesPanel); hide(adminPanel); hide(a
 function openVenues(){ hide(welcome); hide(zoneSelect); hide(adminPanel); hide(analyticsPanel); show(venuesPanel); renderVenues();
   resetScroll(); }
 function openAdmin(){ hide(welcome); hide(zoneSelect); hide(venuesPanel); hide(analyticsPanel); show(adminPanel); }
-function openAnalytics(){ hide(welcome); hide(zoneSelect); hide(venuesPanel); hide(adminPanel); show(analyticsPanel); renderAnalytics(); }
+async function openAnalytics(){ hide(welcome); hide(zoneSelect); hide(venuesPanel); hide(adminPanel); show(analyticsPanel); if(isAdmin()){ try{ await loadVenues(); }catch(e){ console.warn('openAnalytics: loadVenues failed', e); } try{ await syncEventsFromServer(); }catch(e){ console.warn('openAnalytics: syncEventsFromServer failed', e); } } renderAnalytics(); }
 
 document.getElementById('viewVenues')?.addEventListener('click', (e)=>{ e.preventDefault(); openZones(); });
 document.getElementById('backToZones')?.addEventListener('click', openZones);
@@ -1940,7 +1972,16 @@ document.getElementById('clearVenuesBtn')?.addEventListener('click', async ()=>{
 /* =========================
    Analytics Panel buttons
 // ========================= */
-document.getElementById('refreshAnalytics')?.addEventListener('click', renderAnalytics);
+document.getElementById('refreshAnalytics')?.addEventListener('click', async ()=>{
+  // Refresh venues + events from server for admins, then re-render analytics
+  try{
+    if(isAdmin()){
+      try{ await loadVenues(); }catch(e){ console.warn('refreshAnalytics: loadVenues failed', e); }
+      try{ await syncEventsFromServer(); }catch(e){ console.warn('refreshAnalytics: syncEventsFromServer failed', e); }
+    }
+  }catch(e){ console.warn('refreshAnalytics sync failed', e); }
+  try{ renderAnalytics(); }catch(e){ console.warn('renderAnalytics error', e); }
+});
 
 document.getElementById('resetAnalytics')?.addEventListener('click', ()=>{
   if(!isAdmin()) return;

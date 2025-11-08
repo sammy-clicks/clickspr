@@ -75,11 +75,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// NOTE: move static serving until __dirname is available (ES modules)
+
 // =================== DATABASE ===================
 // ES module compatibility: provide __filename and __dirname using fileURLToPath
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Serve backups directory so created DB snapshots can be downloaded directly
+app.use('/backups', express.static(path.join(__dirname, 'backups')));
 
 // Allow overriding the DB path via environment (useful for persistent mounts).
 // By default, prefer a user-specific persistent location (in the user's
@@ -120,30 +125,103 @@ app.get('/admin/export-db', (req, res) => {
     return res.status(200).end();
   }
 
+  // NOTE: older clients may struggle with streaming when the server
+  // process is under restart; provide a simpler, dedicated streaming
+  // endpoint below and recommend clients use /admin/export-db-download
+  // for direct browser downloads.
+
   // If client asked for a direct download (useful when running remotely),
   // stream the DB file as an attachment so the admin can save it locally.
   if (req.query.download === '1' || req.query.download === 'true') {
-    if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
-    return res.download(DB_PATH, 'venues.db', (err) => {
-      if (err) console.error('Error streaming DB file:', err && err.message);
-    });
+    // Ensure WAL checkpoint so the downloaded DB contains latest commits
+    (async () => {
+      try { await runWithRetry("PRAGMA wal_checkpoint(TRUNCATE);"); } catch(e){ console.warn('⚠️ WAL checkpoint failed for download (continuing):', e && e.message); }
+      if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
+      return res.download(DB_PATH, 'venues.db', (err) => {
+        if (err) console.error('Error streaming DB file:', err && err.message);
+      });
+    })();
+    return;
   }
+
+  // Dedicated, robust streaming endpoint for browser downloads.
+  app.get('/admin/export-db-download', async (req, res) => {
+    const keyFromReq = req.query.key || req.headers['x-admin-key'];
+    const secret = process.env.ADMIN_DB_EXPORT_KEY;
+    if (!secret) return res.status(403).send('DB export disabled');
+    if (!keyFromReq || keyFromReq !== secret) return res.status(401).send('unauthorized');
+
+    try {
+      // Ensure WAL checkpoint synchronously (runWithRetry returns a promise)
+      try { await runWithRetry("PRAGMA wal_checkpoint(TRUNCATE);"); } catch(e){ console.warn('⚠️ WAL checkpoint failed for download (continuing):', e && e.message); }
+
+      if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
+
+      // Stream the file with safe error handling
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="venues.db"');
+      const stream = fs.createReadStream(DB_PATH);
+      stream.on('error', (err) => {
+        console.error('DB stream error:', err && err.message);
+        if (!res.headersSent) res.status(500).send('stream error');
+        try { stream.destroy(); } catch(_){}
+      });
+      stream.pipe(res);
+    } catch (err) {
+      console.error('Export download failed:', err && (err.stack || err.message || String(err)));
+      res.status(500).send('export failed');
+    }
+  });
 
   const BACKUP_DIR = path.join(__dirname, 'backups');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
   const BACKUP_PATH = path.join(BACKUP_DIR, `venues-backup-${timestamp}.db`);
 
-  try {
-    if (!fs.existsSync(BACKUP_DIR)) {
-      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  (async () => {
+    try {
+      // Ensure backup dir exists
+      if (!fs.existsSync(BACKUP_DIR)) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      }
+
+      // Force WAL checkpoint to flush WAL into main DB file so the copied
+      // database contains the latest transactions. This prevents backups
+      // missing recent writes that are only in the -wal journal.
+      try {
+        await runWithRetry("PRAGMA wal_checkpoint(TRUNCATE);");
+      } catch (ckErr) {
+        console.warn('⚠️ WAL checkpoint failed (continuing):', ckErr && ckErr.message);
+      }
+
+      // Use promise API to copy file after checkpoint
+      await fs.promises.copyFile(DB_PATH, BACKUP_PATH);
+
+      // Ensure the newly created backup is fully flushed to disk before
+      // telling clients about it. This reduces races where a client tries
+      // to download the file immediately after creation and the OS/FS
+      // hasn't finished writing metadata/data to disk yet.
+      try {
+        const fh = await fs.promises.open(BACKUP_PATH, 'r');
+        try {
+          // FileHandle.sync() forces a synchronous flush of the file's
+          // data to disk. If this fails, we warn but continue to avoid
+          // blocking the admin flow indefinitely.
+          await fh.sync();
+        } catch (syncErr) {
+          console.warn('⚠️ fsync failed for backup file (continuing):', syncErr && syncErr.message);
+        }
+        await fh.close();
+      } catch (openErr) {
+        console.warn('⚠️ Could not open/fsync backup file (continuing):', openErr && openErr.message);
+      }
+
+      console.log(`✅ Database saved to ${BACKUP_PATH}`);
+      res.status(200).json({ ok: true, message: `Database saved to ${BACKUP_PATH}`, path: BACKUP_PATH });
+    } catch (err) {
+      console.error('❌ Error saving database:', err.message);
+      res.status(500).json({ error: 'Failed to save database: ' + err.message });
     }
-    fs.copyFileSync(DB_PATH, BACKUP_PATH);
-    console.log(`✅ Database saved to ${BACKUP_PATH}`);
-    res.status(200).json({ ok: true, message: `Database saved to ${BACKUP_PATH}`, path: BACKUP_PATH });
-  } catch (err) {
-    console.error('❌ Error saving database:', err.message);
-    res.status(500).json({ error: 'Failed to save database: ' + err.message });
-  }
+  })();
 });
 
 // --- Admin utility: import a DB file (protected)
@@ -160,33 +238,56 @@ app.post('/admin/import-db', fileUpload.single('file'), async (req, res) => {
     const uploadedPath = req.file.path;
     const destPath = DB_PATH;
 
-    // Close the database connection before replacing the file
-    await new Promise((resolve) => {
-      db.close(() => {
-        console.log('🔒 Database connection closed for import');
-        resolve();
+    console.log('🔄 Closing database connection for restore...');
+    
+    // Close the database connection and wait for it
+    await new Promise((resolve, reject) => {
+      db.close((err) => {
+        if (err) {
+          console.error('Error closing DB:', err.message);
+          reject(err);
+        } else {
+          console.log('✅ Database connection closed');
+          resolve();
+        }
       });
     });
 
+    // Wait a moment for file handles to be fully released
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    console.log('📁 Replacing database file...');
+    
     // Copy uploaded file directly to destination (overwrite)
     await fs.promises.copyFile(uploadedPath, destPath);
+    
+    console.log('✅ Database file replaced');
     
     // Clean up uploaded file
     try { await fs.promises.unlink(uploadedPath); } catch (e) {}
 
-    console.log('✅ Database restored successfully. Server will restart...');
+    console.log('🔄 Restarting server to reopen database...');
     
     // Send response before restarting
-    res.json({ ok: true, message: 'Database restored successfully. Server restarting...' });
+    res.json({ ok: true, message: 'Database restored successfully. Server will restart in 1 second...' });
     
-    // Restart the process after a short delay
+    // Restart the process after sending response
     setTimeout(() => {
-      console.log('🔄 Restarting server...');
+      console.log('� Exiting to trigger restart (use PM2 or nodemon for auto-restart)');
       process.exit(0);
-    }, 500);
+    }, 1000);
     
   } catch (err) {
     console.error('❌ Import DB error:', err && (err.stack || err.message || String(err)));
+    // Try to reopen the database if import failed
+    try {
+      const sqlite3 = await import('sqlite3');
+      const newDb = new sqlite3.default.Database(DB_PATH);
+      Object.assign(db, newDb);
+      console.log('⚠️ Database connection reopened after failed import');
+    } catch (reopenErr) {
+      console.error('❌ Could not reopen database:', reopenErr.message);
+    }
     return res.status(500).json({ error: err && err.message });
   }
 });
